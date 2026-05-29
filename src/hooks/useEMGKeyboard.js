@@ -27,7 +27,7 @@ export function useEMGKeyboard({
 
   useEffect(() => {
     let ultimaAccion = 0;
-    const DEBOUNCE_MS = 300;
+    const DEBOUNCE_MS = 800;
 
     ws.current = new WebSocket(wsUrl);
 
