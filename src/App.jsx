@@ -1,0 +1,69 @@
+import { Toaster } from "@/components/ui/toaster"
+import { Toaster as SonnerToaster } from "sonner"
+import { QueryClientProvider } from '@tanstack/react-query'
+import { queryClientInstance } from '@/lib/query-client'
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import PageNotFound from './lib/PageNotFound';
+import { AuthProvider, useAuth } from '@/lib/AuthContext';
+import UserNotRegisteredError from '@/components/UserNotRegisteredError';
+import Writer from './pages/Writer';
+import Profile from './pages/Profile';
+import Practice from './pages/Practice';
+import Landing from './pages/Landing';
+import InfoPage from './pages/InfoPage';
+import LegalPage from './pages/LegalPage';
+import PrivacyPage from './pages/PrivacyPage';
+
+const AuthenticatedApp = () => {
+  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+
+  if (isLoadingPublicSettings || isLoadingAuth) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (authError) {
+    if (authError.type === 'user_not_registered') {
+      return <UserNotRegisteredError />;
+    } else if (authError.type === 'auth_required') {
+      navigateToLogin();
+      return null;
+    }
+  }
+
+  return (
+    <Routes>
+      <Route path="/" element={<Writer />} />
+      <Route path="/profile" element={<Profile />} />
+      <Route path="/practice" element={<Practice />} />
+      <Route path="/info" element={<InfoPage />} />
+      <Route path="/legal" element={<LegalPage />} />
+      <Route path="/privacy" element={<PrivacyPage />} />
+      <Route path="*" element={<PageNotFound />} />
+    </Routes>
+  );
+};
+
+function App() {
+  return (
+    <AuthProvider>
+      <QueryClientProvider client={queryClientInstance}>
+        <Router>
+          <Routes>
+            {/* Ruta pública — no requiere auth */}
+            <Route path="/landing" element={<Landing />} />
+            {/* Rutas protegidas */}
+            <Route path="/*" element={<AuthenticatedApp />} />
+          </Routes>
+        </Router>
+        <Toaster />
+        <SonnerToaster position="top-right" richColors />
+      </QueryClientProvider>
+    </AuthProvider>
+  )
+}
+
+export default App
