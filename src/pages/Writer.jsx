@@ -42,7 +42,7 @@ export default function Writer() {
   const [shift, setShift] = useState(true);
   const [numMode, setNumMode] = useState(false);
 
-  const [zona, setZona] = useState("header");
+  const [zona, setZona] = useState("keyboard");
   const [headerIndex, setHeaderIndex] = useState(0);
   const [actionIndex, setActionIndex] = useState(0);
   const [topIndex, setTopIndex] = useState(0);
@@ -208,7 +208,7 @@ export default function Writer() {
     filaBlockeada, setFilaBloqueada,
     setZona,
     onSelectKey: ejecutarTecla,
-    wsUrl: "ws://localhost:8081",
+    wsUrl: "ws://192.168.4.1:8081",
   });
 
   return (
