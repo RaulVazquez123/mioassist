@@ -23,6 +23,7 @@ const LETTER_ROWS = [
   ["z","x","c","v","b","n","m"],
   ["á","é","í","ó","ú"],
   ["SHIFT","123","ESPACIO","BORRAR","LIMPIAR","DICCIONARIO"],
+  ["PRACTICA","PERFIL"],
 ];
 
 const NUM_ROWS = [
@@ -30,6 +31,7 @@ const NUM_ROWS = [
   ["@","#","$","%","&","*","(",")","−","_"],
   [".",",","?","!",";",":","/" ],
   ["SHIFT","123","ESPACIO","BORRAR","LIMPIAR","DICCIONARIO"],
+  ["PRACTICA","PERFIL"],
 ];
 
 export default function Writer() {
@@ -42,7 +44,8 @@ export default function Writer() {
   const [shift, setShift] = useState(true);
   const [numMode, setNumMode] = useState(false);
 
-  const [zona, setZona] = useState("keyboard");
+  // Zona para navegación por teclado físico (flechas)
+  const [zona, setZona] = useState("top");
   const [headerIndex, setHeaderIndex] = useState(0);
   const [actionIndex, setActionIndex] = useState(0);
   const [topIndex, setTopIndex] = useState(0);
@@ -50,8 +53,11 @@ export default function Writer() {
   const [kbRow, setKbRow] = useState(0);
   const [kbCol, setKbCol] = useState(0);
 
-  // Estado nuevo para la navegación EMG
+  // Estado exclusivo para navegación EMG
   const [filaBlockeada, setFilaBloqueada] = useState(false);
+  const [emgZona, setEmgZona] = useState("top"); // "top" | "keyboard" | "dictionary"
+  const [emgTopIndex, setEmgTopIndex] = useState(0);
+  const [emgDictIndex, setEmgDictIndex] = useState(0);
 
   useEffect(() => {
     loadLanguageModel().then(() => setModelReady(true));
@@ -108,6 +114,8 @@ export default function Writer() {
     if (value === "DICCIONARIO") return openDictionary();
     if (value === "SHIFT")       { setShift((s) => !s); return; }
     if (value === "123")         { setNumMode((n) => !n); setKbRow(0); setKbCol(0); return; }
+    if (value === "PRACTICA")    { window.location.href = "/practice"; return; }
+    if (value === "PERFIL")      { window.location.href = "/profile"; return; }
     const ch = (shift && !numMode) ? value.toUpperCase() : value;
     handleType(ch);
     if (shift && !numMode) setShift(false);
@@ -186,7 +194,6 @@ export default function Writer() {
     if (zona === "suggestions") { const p = suggestionsData[suggestionIndex]?.word; if (p) replaceCurrentWord(p); }
   };
 
-  // Navegación por teclado físico (simulación de EMG en desarrollo)
   useEffect(() => {
     const onKeyDown = (event) => {
       if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Enter"].includes(event.key)) event.preventDefault();
@@ -200,16 +207,39 @@ export default function Writer() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [zona, headerIndex, actionIndex, topIndex, suggestionIndex, kbRow, kbCol, topLettersData, suggestionsData, shift, numMode]);
 
-  // Hook de navegación EMG por contracciones musculares
+  // Hook de navegación EMG
   useEMGKeyboard({
     activeRows,
     kbRow,    setKbRow,
     kbCol,    setKbCol,
     filaBlockeada, setFilaBloqueada,
-    setZona,
+    emgZona,  setEmgZona,
+    topIndex: emgTopIndex, setTopIndex: setEmgTopIndex,
+    dictIndex: emgDictIndex, setDictIndex: setEmgDictIndex,
+    topLettersData,
+    suggestionsData,
     onSelectKey: ejecutarTecla,
+    onSelectWord: replaceCurrentWord,
+    onOpenDictionary: openDictionary,
     wsUrl: "ws://192.168.4.1:8081",
   });
+
+  // Sincronizar emgTopIndex con topIndex para que el resaltado se vea
+  useEffect(() => {
+    setTopIndex(emgTopIndex);
+  }, [emgTopIndex]);
+
+  // Sincronizar emgZona con zona para resaltado visual
+  useEffect(() => {
+    if (emgZona === "top")      setZona("top");
+    if (emgZona === "keyboard") setZona("keyboard");
+    if (emgZona === "dictionary") setZona("suggestions");
+  }, [emgZona]);
+
+  // Sincronizar dictIndex con suggestionIndex para resaltado
+  useEffect(() => {
+    setSuggestionIndex(emgDictIndex);
+  }, [emgDictIndex]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -235,6 +265,8 @@ export default function Writer() {
               zona={zona}
               kbRow={kbRow}
               kbCol={kbCol}
+              filaBlockeada={filaBlockeada}
+              emgZona={emgZona}
               externalShift={shift}
               externalNumMode={numMode}
               onShiftChange={setShift}

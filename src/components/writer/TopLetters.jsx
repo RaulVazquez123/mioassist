@@ -2,6 +2,8 @@ import React from "react";
 import { cn } from "@/lib/utils";
 import { BookOpen } from "lucide-react";
 
+const STYLE_SELECTED = { backgroundColor: "#7dd3fc", borderColor: "#38bdf8", boxShadow: "0 0 0 2px #38bdf8" };
+
 export default function TopLetters({ letters, onPick, zona, topIndex, onOpenDictionary }) {
   return (
     <div>
@@ -26,10 +28,8 @@ export default function TopLetters({ letters, onPick, zona, topIndex, onOpenDict
             <button
               key={`${l}-${i}`}
               onClick={() => onPick(l)}
-              className={cn(
-                "group relative h-20 sm:h-24 rounded-2xl bg-gradient-to-b from-card to-secondary/60 border-2 border-border hover:border-accent hover:from-accent/10 hover:to-primary/5 transition-all duration-200 soft-shadow active:scale-[0.97]",
-                isSelected && "border-accent from-accent/10 to-primary/5 scale-[1.04]"
-              )}
+              style={isSelected ? STYLE_SELECTED : {}}
+              className="group relative h-20 sm:h-24 rounded-2xl bg-gradient-to-b from-card to-secondary/60 border-2 border-border hover:border-accent hover:from-accent/10 hover:to-primary/5 transition-all duration-200 soft-shadow active:scale-[0.97]"
             >
               <span className="absolute top-2 left-3 text-[10px] font-bold tabular-nums text-muted-foreground group-hover:text-accent-foreground">
                 {i + 1}
@@ -46,16 +46,14 @@ export default function TopLetters({ letters, onPick, zona, topIndex, onOpenDict
           );
         })}
 
-        {/* Botón diccionario */}
+        {/* Botón diccionario — azul oscuro igual que el del teclado */}
         <button
           onClick={onOpenDictionary}
-          className={cn(
-            "group relative h-20 sm:h-24 rounded-2xl border-2 border-primary/40 bg-gradient-to-b from-primary/10 to-primary/5 hover:from-primary/20 hover:border-primary transition-all duration-200 soft-shadow active:scale-[0.97] flex flex-col items-center justify-center gap-1",
-            zona === "top" && topIndex === 5 && "border-accent from-accent/10 scale-[1.04]"
-          )}
+          style={zona === "top" && topIndex === 5 ? STYLE_SELECTED : {}}
+          className="group relative h-20 sm:h-24 rounded-2xl border-2 bg-primary text-primary-foreground border-primary hover:bg-primary/90 transition-all duration-200 soft-shadow active:scale-[0.97] flex flex-col items-center justify-center gap-1"
         >
-          <BookOpen className="w-7 h-7 text-primary" />
-          <span className="text-[10px] font-medium text-primary/80 text-center leading-tight px-1">
+          <BookOpen className="w-7 h-7" />
+          <span className="text-[10px] font-medium text-center leading-tight px-1">
             Palabras
           </span>
         </button>

@@ -38,6 +38,7 @@ export default function SuggestionsSidebar({ suggestions, onPick, highlighted, i
                 "group w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-2xl border border-border/60 bg-background hover:border-accent hover:bg-accent/5 transition-all text-left active:scale-[0.98]",
                 isSelected && "border-accent bg-accent/10 scale-[1.02]"
               )}
+              style={isSelected ? { boxShadow: "0 0 0 2px #7dd3fc" } : {}}
             >
               <div className="flex items-center gap-3 min-w-0">
                 <span className="w-7 h-7 shrink-0 rounded-lg bg-secondary group-hover:bg-accent/20 flex items-center justify-center text-[11px] font-bold tabular-nums text-muted-foreground group-hover:text-primary">
