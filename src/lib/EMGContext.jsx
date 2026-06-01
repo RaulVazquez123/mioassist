@@ -1,8 +1,4 @@
-// src/lib/EMGContext.jsx
-// Contexto global que escucha el WebSocket del ESP32 y comparte
-// los datos de señal EMG con toda la app.
-
-import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
 
 const EMGContext = createContext(null);
 
@@ -16,6 +12,24 @@ export function EMGProvider({ children, wsUrl = "ws://192.168.4.1:8081" }) {
   const [pico, setPico] = useState(0);
   const [connected, setConnected] = useState(false);
   const lastMsgTime = useRef(null);
+  const ultimaAccion = useRef(0);
+  const DEBOUNCE_MS = 800;
+
+  // Owner system — solo un componente recibe clicks a la vez
+  const ownerRef = useRef(null);
+  const callbacksRef = useRef({});
+
+  const claimEMG = useCallback((owner, onDer, onIzq) => {
+    ownerRef.current = owner;
+    callbacksRef.current = { onDer, onIzq };
+  }, []);
+
+  const releaseEMG = useCallback((owner) => {
+    if (ownerRef.current === owner) {
+      ownerRef.current = null;
+      callbacksRef.current = {};
+    }
+  }, []);
 
   useEffect(() => {
     let intervalo;
@@ -30,24 +44,31 @@ export function EMGProvider({ children, wsUrl = "ws://192.168.4.1:8081" }) {
 
       ws.current.onmessage = (event) => {
         const ahora = Date.now();
-        if (lastMsgTime.current) {
-          setLatencia(ahora - lastMsgTime.current);
-        }
+        if (lastMsgTime.current) setLatencia(ahora - lastMsgTime.current);
         lastMsgTime.current = ahora;
 
         try {
           const data = JSON.parse(event.data);
           setEmgData(data);
 
-          // Pico = max RMS entre las dos manos
           const maxRms = Math.max(data.izq?.rms || 0, data.der?.rms || 0);
           if (maxRms > 0) setPico((prev) => Math.max(prev * 0.95, maxRms));
+
+          // Despachar clicks al owner actual
+          if (ahora - ultimaAccion.current < DEBOUNCE_MS) return;
+          const clickIzq = data.izq?.click === 1;
+          const clickDer = data.der?.click === 1;
+          if (!clickIzq && !clickDer) return;
+          if (clickIzq && clickDer) return;
+          ultimaAccion.current = ahora;
+
+          if (clickDer) callbacksRef.current.onDer?.();
+          if (clickIzq) callbacksRef.current.onIzq?.();
         } catch (e) {}
       };
 
       ws.current.onclose = () => {
         setConnected(false);
-        console.log("🔌 EMG Context WebSocket cerrado");
       };
 
       ws.current.onerror = () => {
@@ -57,11 +78,8 @@ export function EMGProvider({ children, wsUrl = "ws://192.168.4.1:8081" }) {
 
     conectar();
 
-    // Reintentar cada 5s si se desconecta
     intervalo = setInterval(() => {
-      if (!ws.current || ws.current.readyState === WebSocket.CLOSED) {
-        conectar();
-      }
+      if (!ws.current || ws.current.readyState === WebSocket.CLOSED) conectar();
     }, 5000);
 
     return () => {
@@ -70,23 +88,20 @@ export function EMGProvider({ children, wsUrl = "ws://192.168.4.1:8081" }) {
     };
   }, [wsUrl]);
 
-  const umbral = 42; // µV — fijo por ahora, luego se puede calcular de la calibración
+  const umbral = 42;
   const rmsActual = Math.max(emgData.izq?.rms || 0, emgData.der?.rms || 0);
 
   return (
     <EMGContext.Provider value={{
-      emgData,
-      connected,
-      rmsActual,
-      pico,
-      umbral,
-      latencia,
+      emgData, connected, rmsActual, pico, umbral, latencia,
       izqConectado: emgData.izq?.conectado === 1,
       derConectado: emgData.der?.conectado === 1,
       izqRms: emgData.izq?.rms || 0,
       derRms: emgData.der?.rms || 0,
       izqMnf: emgData.izq?.mnf || 0,
       derMnf: emgData.der?.mnf || 0,
+      claimEMG,
+      releaseEMG,
     }}>
       {children}
     </EMGContext.Provider>
@@ -95,6 +110,12 @@ export function EMGProvider({ children, wsUrl = "ws://192.168.4.1:8081" }) {
 
 export function useEMG() {
   const ctx = useContext(EMGContext);
-  if (!ctx) return { emgData: { izq: { click: 0, rms: 0, mnf: 0, conectado: 0 }, der: { click: 0, rms: 0, mnf: 0, conectado: 0 } }, connected: false, rmsActual: 0, pico: 0, umbral: 42, latencia: 0, izqConectado: false, derConectado: false, izqRms: 0, derRms: 0, izqMnf: 0, derMnf: 0 };
+  if (!ctx) return {
+    emgData: { izq: { click: 0, rms: 0, mnf: 0, conectado: 0 }, der: { click: 0, rms: 0, mnf: 0, conectado: 0 } },
+    connected: false, rmsActual: 0, pico: 0, umbral: 42, latencia: 0,
+    izqConectado: false, derConectado: false,
+    izqRms: 0, derRms: 0, izqMnf: 0, derMnf: 0,
+    claimEMG: () => {}, releaseEMG: () => {},
+  };
   return ctx;
 }

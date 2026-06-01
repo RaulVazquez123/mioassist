@@ -1,10 +1,29 @@
 import React from "react";
 import Header from "@/components/layout/Header";
+import { useEMGPage } from "@/hooks/useEMGPage";
 import { Shield, Mail, FileText } from "lucide-react";
 
-function Section({ title, children }) {
+const STYLE_ACTIVE = { borderColor: "#38bdf8", boxShadow: "0 0 0 2px #38bdf8" };
+
+// 8 secciones + 1 bloque contacto = 9 bloques
+const SECTION_TITLES = [
+  "Identidad y domicilio del Responsable",
+  "Datos personales recabados",
+  "Finalidad del tratamiento",
+  "Transferencia de datos",
+  "Derechos ARCO",
+  "Medidas de seguridad",
+  "Revocación del consentimiento",
+  "Cambios al aviso de privacidad",
+];
+
+function Section({ title, children, blockIdx, activeBlock }) {
   return (
-    <div className="mb-8">
+    <div
+      id={`emg-block-${blockIdx}`}
+      style={activeBlock === blockIdx ? STYLE_ACTIVE : {}}
+      className="mb-8 rounded-2xl border border-transparent p-4 -m-4 transition-all"
+    >
       <h3 className="text-base font-semibold text-foreground mb-3 flex items-center gap-2">
         <span className="w-1 h-5 rounded-full bg-primary inline-block" />
         {title}
@@ -15,12 +34,17 @@ function Section({ title, children }) {
 }
 
 export default function PrivacyPage() {
+  const { activeBlock } = useEMGPage({
+    blockCount: 9,
+    onBlockAction: () => {},
+    ownerId: "privacypage",
+  });
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <main className="max-w-3xl mx-auto px-4 sm:px-8 py-8 lg:py-12">
 
-        {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-2">
             <Shield className="w-4 h-4 text-primary" />
@@ -36,7 +60,7 @@ export default function PrivacyPage() {
 
         <div className="rounded-3xl border border-border/70 bg-card soft-shadow p-7 sm:p-10 space-y-0">
 
-          <Section title="Identidad y domicilio del Responsable">
+          <Section title="Identidad y domicilio del Responsable" blockIdx={0} activeBlock={activeBlock}>
             <p>
               <strong>MioAssist</strong> (en adelante "el Responsable"), con domicilio en Ciudad de México, México, 
               es responsable del tratamiento de sus datos personales conforme a lo establecido en la 
@@ -44,7 +68,7 @@ export default function PrivacyPage() {
             </p>
           </Section>
 
-          <Section title="Datos personales recabados">
+          <Section title="Datos personales recabados" blockIdx={1} activeBlock={activeBlock}>
             <p>El Responsable recaba las siguientes categorías de datos personales:</p>
             <ul className="list-disc list-inside space-y-1 mt-2 ml-2">
               <li><strong>Datos de identificación:</strong> nombre completo, correo electrónico.</li>
@@ -58,7 +82,7 @@ export default function PrivacyPage() {
             </p>
           </Section>
 
-          <Section title="Finalidad del tratamiento">
+          <Section title="Finalidad del tratamiento" blockIdx={2} activeBlock={activeBlock}>
             <p>Sus datos personales serán utilizados para las siguientes finalidades:</p>
             <div className="mt-2 space-y-2">
               <div className="rounded-xl border border-border/60 bg-background px-4 py-3">
@@ -84,7 +108,7 @@ export default function PrivacyPage() {
             </p>
           </Section>
 
-          <Section title="Transferencia de datos">
+          <Section title="Transferencia de datos" blockIdx={3} activeBlock={activeBlock}>
             <p>Sus datos personales podrán ser transferidos a:</p>
             <div className="mt-2 overflow-x-auto">
               <table className="w-full text-xs border-collapse">
@@ -119,7 +143,7 @@ export default function PrivacyPage() {
             </p>
           </Section>
 
-          <Section title="Derechos ARCO">
+          <Section title="Derechos ARCO" blockIdx={4} activeBlock={activeBlock}>
             <p>
               Usted tiene derecho a <strong>Acceder, Rectificar, Cancelar y Oponerse</strong> al tratamiento de sus datos personales (derechos ARCO), así como a revocar el consentimiento otorgado.
             </p>
@@ -145,7 +169,7 @@ export default function PrivacyPage() {
             </p>
           </Section>
 
-          <Section title="Medidas de seguridad">
+          <Section title="Medidas de seguridad" blockIdx={5} activeBlock={activeBlock}>
             <ul className="list-disc list-inside space-y-1">
               <li>Transmisión de datos mediante protocolo HTTPS/TLS cifrado.</li>
               <li>Control de acceso por roles (usuario, médico, administrador).</li>
@@ -156,7 +180,7 @@ export default function PrivacyPage() {
             </ul>
           </Section>
 
-          <Section title="Revocación del consentimiento">
+          <Section title="Revocación del consentimiento" blockIdx={6} activeBlock={activeBlock}>
             <p>
               Puede revocar el consentimiento para el tratamiento de sus datos en cualquier momento, 
               especialmente para finalidades secundarias (compartir con médico, mejora del sistema).
@@ -167,7 +191,7 @@ export default function PrivacyPage() {
             </p>
           </Section>
 
-          <Section title="Cambios al aviso de privacidad">
+          <Section title="Cambios al aviso de privacidad" blockIdx={7} activeBlock={activeBlock}>
             <p>
               El presente aviso puede ser modificado. Cualquier cambio relevante será notificado mediante 
               aviso en la aplicación con al menos 30 días de anticipación. La versión vigente siempre 
@@ -175,8 +199,12 @@ export default function PrivacyPage() {
             </p>
           </Section>
 
-          {/* Contact */}
-          <div className="mt-8 rounded-2xl border border-primary/20 bg-primary/5 px-5 py-4 flex items-start gap-3">
+          {/* Contacto — bloque 8 */}
+          <div
+            id="emg-block-8"
+            style={activeBlock === 8 ? STYLE_ACTIVE : {}}
+            className="mt-8 rounded-2xl border border-primary/20 bg-primary/5 px-5 py-4 flex items-start gap-3 transition-all"
+          >
             <Mail className="w-5 h-5 text-primary mt-0.5 shrink-0" />
             <div>
               <div className="font-semibold text-sm">Contacto del Responsable de Privacidad</div>
