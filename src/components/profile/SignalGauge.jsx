@@ -1,9 +1,18 @@
 import React from "react";
+import { useEMG } from "@/lib/EMGContext";
 
-export default function SignalGauge({ avg = 68, max = 118 }) {
-  const pct = Math.min(100, (avg / max) * 100);
+export default function SignalGauge({ avg: avgProp = 68, max: maxProp = 118 }) {
+  const { rmsActual, pico, connected, izqConectado, derConectado } = useEMG();
+
+  const avg = connected && rmsActual > 0 ? Math.round(rmsActual) : avgProp;
+  const max = connected && pico > 0     ? Math.round(pico)      : maxProp;
+
+  const pct = max > 0 ? Math.min(100, (avg / max) * 100) : 0;
   const circumference = 2 * Math.PI * 54;
   const offset = circumference - (pct / 100) * circumference;
+
+  // Señal estable = ambos electrodos conectados y RMS razonable
+  const estable = connected ? (izqConectado && derConectado) : true;
 
   return (
     <div className="rounded-3xl border border-border/70 bg-card p-5 soft-shadow flex flex-col items-center">
@@ -20,12 +29,9 @@ export default function SignalGauge({ avg = 68, max = 118 }) {
         <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
           <circle cx="60" cy="60" r="54" stroke="hsl(var(--secondary))" strokeWidth="10" fill="none" />
           <circle
-            cx="60"
-            cy="60"
-            r="54"
+            cx="60" cy="60" r="54"
             stroke="url(#gauge-grad)"
-            strokeWidth="10"
-            fill="none"
+            strokeWidth="10" fill="none"
             strokeLinecap="round"
             strokeDasharray={circumference}
             strokeDashoffset={offset}
@@ -52,7 +58,9 @@ export default function SignalGauge({ avg = 68, max = 118 }) {
         <div className="w-px h-6 bg-border" />
         <div className="text-center">
           <div className="text-muted-foreground">Estable</div>
-          <div className="font-semibold text-emerald-600">Sí</div>
+          <div className={`font-semibold ${estable ? "text-emerald-600" : "text-red-500"}`}>
+            {estable ? "Sí" : "No"}
+          </div>
         </div>
       </div>
     </div>

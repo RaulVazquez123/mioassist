@@ -2,8 +2,12 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Copy, Download, Volume2, Twitter, MessageCircle, Check } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
-export default function ActionBar({ text }) {
+const STYLE_DEFAULT  = {};
+const STYLE_SELECTED = { backgroundColor: "#7dd3fc", borderColor: "#38bdf8", color: "#0f172a", boxShadow: "0 0 0 2px #38bdf8" };
+
+export default function ActionBar({ text, emgZona, emgActionIndex }) {
   const [copied, setCopied] = React.useState(false);
   const disabled = !text.trim();
 
@@ -51,30 +55,35 @@ export default function ActionBar({ text }) {
 
   const actions = [
     { key: "copy", label: copied ? "Copiado" : "Copiar", icon: copied ? Check : Copy, onClick: handleCopy, tone: "default" },
-    { key: "wa", label: "WhatsApp", icon: MessageCircle, onClick: handleWhatsApp, tone: "green" },
-    { key: "x", label: "Publicar en X", icon: Twitter, onClick: handleTwitter, tone: "default" },
-    { key: "dl", label: "Descargar", icon: Download, onClick: handleDownload, tone: "default" },
-    { key: "tts", label: "Leer en voz", icon: Volume2, onClick: handleSpeak, tone: "accent" },
+    { key: "wa",   label: "WhatsApp",      icon: MessageCircle, onClick: handleWhatsApp, tone: "green" },
+    { key: "x",    label: "Publicar en X", icon: Twitter,       onClick: handleTwitter,  tone: "default" },
+    { key: "dl",   label: "Descargar",     icon: Download,      onClick: handleDownload, tone: "default" },
+    { key: "tts",  label: "Leer en voz",   icon: Volume2,       onClick: handleSpeak,    tone: "accent" },
   ];
 
   return (
     <div className="flex flex-wrap gap-2 sm:gap-3">
-      {actions.map(({ key, label, icon: Icon, onClick, tone }) => (
-        <Button
-          key={key}
-          onClick={onClick}
-          disabled={disabled}
-          variant="outline"
-          size="lg"
-          className={`h-12 px-5 rounded-2xl border-border/70 bg-card hover:bg-secondary transition-all soft-shadow
-            ${tone === "accent" ? "hover:border-accent hover:text-accent-foreground" : ""}
-            ${tone === "green" ? "hover:border-emerald-500/50 hover:text-emerald-600" : ""}
-          `}
-        >
-          <Icon className="w-4 h-4 mr-2" />
-          <span className="font-medium">{label}</span>
-        </Button>
-      ))}
+      {actions.map(({ key, label, icon: Icon, onClick, tone }, i) => {
+        const isSelected = emgZona === "actions" && emgActionIndex === i;
+        return (
+          <Button
+            key={key}
+            onClick={onClick}
+            disabled={disabled}
+            variant="outline"
+            size="lg"
+            style={isSelected ? STYLE_SELECTED : STYLE_DEFAULT}
+            className={cn(
+              "h-12 px-5 rounded-2xl border-border/70 bg-card hover:bg-secondary transition-all soft-shadow",
+              tone === "accent" && "hover:border-accent hover:text-accent-foreground",
+              tone === "green"  && "hover:border-emerald-500/50 hover:text-emerald-600",
+            )}
+          >
+            <Icon className="w-4 h-4 mr-2" />
+            <span className="font-medium">{label}</span>
+          </Button>
+        );
+      })}
     </div>
   );
 }

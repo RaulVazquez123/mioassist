@@ -1,8 +1,11 @@
 import React from "react";
 import EMGStatusBar from "@/components/layout/EMGStatusBar";
 import { Activity } from "lucide-react";
+import { useEMG } from "@/lib/EMGContext";
 
 export default function SignalPanel() {
+  const { rmsActual, pico, umbral, latencia } = useEMG();
+
   return (
     <div className="rounded-3xl bg-gradient-to-br from-primary to-[hsl(196_85%_22%)] text-primary-foreground p-5 soft-shadow overflow-hidden relative">
       <div className="absolute inset-0 opacity-20 pointer-events-none">
@@ -15,21 +18,27 @@ export default function SignalPanel() {
             Señal EMG en vivo
           </span>
         </div>
-        <span className="text-xs font-medium tabular-nums opacity-80">74 µV</span>
+        <span className="text-xs font-medium tabular-nums opacity-80">
+          {rmsActual > 0 ? `${rmsActual.toFixed(1)} µV` : "— µV"}
+        </span>
       </div>
       <EMGStatusBar />
       <div className="relative mt-4 grid grid-cols-3 gap-3 text-xs">
         <div>
           <div className="opacity-70">Umbral</div>
-          <div className="font-semibold tabular-nums text-sm">42 µV</div>
+          <div className="font-semibold tabular-nums text-sm">{umbral} µV</div>
         </div>
         <div>
           <div className="opacity-70">Pico</div>
-          <div className="font-semibold tabular-nums text-sm">118 µV</div>
+          <div className="font-semibold tabular-nums text-sm">
+            {pico > 0 ? `${pico.toFixed(1)} µV` : "— µV"}
+          </div>
         </div>
         <div>
           <div className="opacity-70">Latencia</div>
-          <div className="font-semibold tabular-nums text-sm">84 ms</div>
+          <div className="font-semibold tabular-nums text-sm">
+            {latencia > 0 ? `${latencia} ms` : "— ms"}
+          </div>
         </div>
       </div>
     </div>

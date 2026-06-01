@@ -23,7 +23,7 @@ const LETTER_ROWS = [
   ["z","x","c","v","b","n","m"],
   ["á","é","í","ó","ú"],
   ["SHIFT","123","ESPACIO","BORRAR","LIMPIAR","DICCIONARIO"],
-  ["PRACTICA","PERFIL"],
+  ["COMPARTIR","PRACTICA","PERFIL"],
 ];
 
 const NUM_ROWS = [
@@ -31,7 +31,7 @@ const NUM_ROWS = [
   ["@","#","$","%","&","*","(",")","−","_"],
   [".",",","?","!",";",":","/" ],
   ["SHIFT","123","ESPACIO","BORRAR","LIMPIAR","DICCIONARIO"],
-  ["PRACTICA","PERFIL"],
+  ["COMPARTIR","PRACTICA","PERFIL"],
 ];
 
 export default function Writer() {
@@ -55,9 +55,10 @@ export default function Writer() {
 
   // Estado exclusivo para navegación EMG
   const [filaBlockeada, setFilaBloqueada] = useState(false);
-  const [emgZona, setEmgZona] = useState("top"); // "top" | "keyboard" | "dictionary"
+  const [emgZona, setEmgZona] = useState("top"); // "top" | "keyboard" | "dictionary" | "actions"
   const [emgTopIndex, setEmgTopIndex] = useState(0);
   const [emgDictIndex, setEmgDictIndex] = useState(0);
+  const [emgActionIndex, setEmgActionIndex] = useState(0);
 
   useEffect(() => {
     loadLanguageModel().then(() => setModelReady(true));
@@ -107,6 +108,44 @@ export default function Writer() {
     setSuggestionIndex(0);
   };
 
+  const openSharing = () => {
+    setEmgZona("actions");
+    setEmgActionIndex(0);
+  };
+
+  const ACTION_HANDLERS = [
+    // Copiar
+    async () => {
+      if (!text.trim()) return;
+      await navigator.clipboard.writeText(text);
+    },
+    // WhatsApp
+    () => { if (!text.trim()) return; window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank"); },
+    // Publicar en X
+    () => { if (!text.trim()) return; window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, "_blank"); },
+    // Descargar
+    () => {
+      if (!text.trim()) return;
+      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `mioassist-${Date.now()}.txt`; a.click();
+      URL.revokeObjectURL(url);
+    },
+    // Leer en voz
+    () => {
+      if (!text.trim() || !("speechSynthesis" in window)) return;
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = "es-ES";
+      speechSynthesis.cancel();
+      speechSynthesis.speak(utter);
+    },
+  ];
+
+  const onExecuteAction = (index) => {
+    ACTION_HANDLERS[index]?.();
+  };
+
   const ejecutarTecla = (value) => {
     if (value === "ESPACIO")     return handleSpace();
     if (value === "BORRAR")      return handleBackspace();
@@ -116,6 +155,7 @@ export default function Writer() {
     if (value === "123")         { setNumMode((n) => !n); setKbRow(0); setKbCol(0); return; }
     if (value === "PRACTICA")    { window.location.href = "/practice"; return; }
     if (value === "PERFIL")      { window.location.href = "/profile"; return; }
+    if (value === "COMPARTIR")   { console.log("COMPARTIR ejecutado"); openSharing(); return; }
     const ch = (shift && !numMode) ? value.toUpperCase() : value;
     handleType(ch);
     if (shift && !numMode) setShift(false);
@@ -216,11 +256,13 @@ export default function Writer() {
     emgZona,  setEmgZona,
     topIndex: emgTopIndex, setTopIndex: setEmgTopIndex,
     dictIndex: emgDictIndex, setDictIndex: setEmgDictIndex,
+    actionIndex: emgActionIndex, setActionIndex: setEmgActionIndex,
     topLettersData,
     suggestionsData,
     onSelectKey: ejecutarTecla,
     onSelectWord: replaceCurrentWord,
     onOpenDictionary: openDictionary,
+    onExecuteAction,
     wsUrl: "ws://192.168.4.1:8081",
   });
 
@@ -248,7 +290,7 @@ export default function Writer() {
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-5 lg:gap-8">
           <div className="space-y-5">
             <TextCanvas value={text} onChange={setText} />
-            <ActionBar text={text} zona={zona} actionIndex={actionIndex} triggerActionSignal={triggerActionSignal} />
+            <ActionBar text={text} zona={zona} actionIndex={actionIndex} triggerActionSignal={triggerActionSignal} emgZona={emgZona} emgActionIndex={emgActionIndex} />
             <TopLetters
               letters={topLettersData}
               onPick={(l) => ejecutarTecla(l)}
@@ -262,6 +304,7 @@ export default function Writer() {
               onClear={handleClear}
               onSpace={handleSpace}
               onOpenDictionary={openDictionary}
+              onOpenSharing={openSharing}
               zona={zona}
               kbRow={kbRow}
               kbCol={kbCol}

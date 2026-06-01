@@ -1,6 +1,6 @@
 import React from "react";
 import KeyButton from "./KeyButton";
-import { ArrowBigUp, Delete, Eraser, Space, BookOpen, Hash, Dumbbell, User } from "lucide-react";
+import { ArrowBigUp, Delete, Eraser, Space, BookOpen, Hash, Dumbbell, User, Share2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const ROW1   = ["q","w","e","r","t","y","u","i","o","p"];
@@ -19,7 +19,7 @@ const STYLE_NAV_FILA    = { backgroundColor: "#6ee7b7", borderColor: "#10b981", 
 const STYLE_NAV_ACTIVA  = { backgroundColor: "#059669", borderColor: "#047857", color: "#ffffff", boxShadow: "0 0 0 2px #047857" };
 
 // Fila de navegación — índice de fila 5 en LETTER_ROWS, 4 en NUM_ROWS
-export const NAV_ROW = ["PRACTICA", "PERFIL"];
+export const NAV_ROW = ["COMPARTIR", "PRACTICA", "PERFIL"];
 
 export default function Keyboard({
   onType,
@@ -27,6 +27,7 @@ export default function Keyboard({
   onClear,
   onSpace,
   onOpenDictionary = () => {},
+  onOpenSharing = () => {},
   zona,
   kbRow,
   kbCol,
@@ -144,10 +145,18 @@ export default function Keyboard({
       </div>
 
       {/* Fila de navegación — verde para distinguirse */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
+      <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+        <button
+          onClick={onOpenSharing}
+          style={{ ...STYLE_NAV_DEFAULT, ...keyStyle(NAV_ROW_IDX, 0) }}
+          className="h-14 rounded-2xl border-2 font-semibold text-base flex items-center justify-center gap-2 transition-all"
+        >
+          <Share2 className="w-5 h-5" />
+          Compartir
+        </button>
         <button
           onClick={() => handleNavKey("PRACTICA")}
-          style={{ ...STYLE_NAV_DEFAULT, ...keyStyle(NAV_ROW_IDX, 0) }}
+          style={{ ...STYLE_NAV_DEFAULT, ...keyStyle(NAV_ROW_IDX, 1) }}
           className="h-14 rounded-2xl border-2 font-semibold text-base flex items-center justify-center gap-2 transition-all"
         >
           <Dumbbell className="w-5 h-5" />
@@ -155,7 +164,7 @@ export default function Keyboard({
         </button>
         <button
           onClick={() => handleNavKey("PERFIL")}
-          style={{ ...STYLE_NAV_DEFAULT, ...keyStyle(NAV_ROW_IDX, 1) }}
+          style={{ ...STYLE_NAV_DEFAULT, ...keyStyle(NAV_ROW_IDX, 2) }}
           className="h-14 rounded-2xl border-2 font-semibold text-base flex items-center justify-center gap-2 transition-all"
         >
           <User className="w-5 h-5" />
