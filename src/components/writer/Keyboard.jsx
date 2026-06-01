@@ -28,6 +28,7 @@ export default function Keyboard({
   onSpace,
   onOpenDictionary = () => {},
   onOpenSharing = () => {},
+  hideNavRow = false,
   zona,
   kbRow,
   kbCol,
@@ -72,6 +73,7 @@ export default function Keyboard({
   const handleNavKey = (key) => {
     if (key === "PRACTICA") navigate("/practice");
     if (key === "PERFIL")   navigate("/profile");
+    if (key === "SALIR")    onOpenSharing(); // onOpenSharing se reutiliza para Salir en Practice
   };
 
   return (
@@ -144,33 +146,41 @@ export default function Keyboard({
         )}
       </div>
 
-      {/* Fila de navegación — verde para distinguirse */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
-        <button
-          onClick={onOpenSharing}
-          style={{ ...STYLE_NAV_DEFAULT, ...keyStyle(NAV_ROW_IDX, 0) }}
-          className="h-14 rounded-2xl border-2 font-semibold text-base flex items-center justify-center gap-2 transition-all"
-        >
-          <Share2 className="w-5 h-5" />
-          Compartir
-        </button>
-        <button
-          onClick={() => handleNavKey("PRACTICA")}
-          style={{ ...STYLE_NAV_DEFAULT, ...keyStyle(NAV_ROW_IDX, 1) }}
-          className="h-14 rounded-2xl border-2 font-semibold text-base flex items-center justify-center gap-2 transition-all"
-        >
-          <Dumbbell className="w-5 h-5" />
-          Práctica
-        </button>
-        <button
-          onClick={() => handleNavKey("PERFIL")}
-          style={{ ...STYLE_NAV_DEFAULT, ...keyStyle(NAV_ROW_IDX, 2) }}
-          className="h-14 rounded-2xl border-2 font-semibold text-base flex items-center justify-center gap-2 transition-all"
-        >
-          <User className="w-5 h-5" />
-          Perfil EMG
-        </button>
+      {/* Fila de navegación */}
+      {!hideNavRow && (
+      <div className={`grid grid-cols-${NAV_ROW.length === 1 ? "1" : "3"} gap-2 sm:gap-2.5`}>
+        {NAV_ROW.map((key, idx) => {
+          if (key === "SALIR") {
+            return (
+              <button
+                key="SALIR"
+                onClick={() => handleNavKey("SALIR")}
+                style={{ backgroundColor: "#fee2e2", borderColor: "#fca5a5", color: "#991b1b", ...keyStyle(NAV_ROW_IDX, idx) }}
+                className="h-14 rounded-2xl border-2 font-semibold text-base flex items-center justify-center gap-2 transition-all"
+              >
+                ✕ Salir del ejercicio
+              </button>
+            );
+          }
+          if (key === "COMPARTIR") return (
+            <button key="COMPARTIR" onClick={onOpenSharing} style={{ ...STYLE_NAV_DEFAULT, ...keyStyle(NAV_ROW_IDX, idx) }} className="h-14 rounded-2xl border-2 font-semibold text-base flex items-center justify-center gap-2 transition-all">
+              <Share2 className="w-5 h-5" />Compartir
+            </button>
+          );
+          if (key === "PRACTICA") return (
+            <button key="PRACTICA" onClick={() => handleNavKey("PRACTICA")} style={{ ...STYLE_NAV_DEFAULT, ...keyStyle(NAV_ROW_IDX, idx) }} className="h-14 rounded-2xl border-2 font-semibold text-base flex items-center justify-center gap-2 transition-all">
+              <Dumbbell className="w-5 h-5" />Práctica
+            </button>
+          );
+          if (key === "PERFIL") return (
+            <button key="PERFIL" onClick={() => handleNavKey("PERFIL")} style={{ ...STYLE_NAV_DEFAULT, ...keyStyle(NAV_ROW_IDX, idx) }} className="h-14 rounded-2xl border-2 font-semibold text-base flex items-center justify-center gap-2 transition-all">
+              <User className="w-5 h-5" />Perfil EMG
+            </button>
+          );
+          return null;
+        })}
       </div>
+      )}
 
     </div>
   );

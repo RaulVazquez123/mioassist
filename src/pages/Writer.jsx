@@ -263,7 +263,7 @@ export default function Writer() {
     onSelectWord: replaceCurrentWord,
     onOpenDictionary: openDictionary,
     onExecuteAction,
-    wsUrl: "ws://192.168.4.1:8081",
+    wsUrl: "ws://localhost:8081",
   });
 
   // Sincronizar emgTopIndex con topIndex para que el resaltado se vea

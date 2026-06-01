@@ -72,7 +72,7 @@ function App() {
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
-        <EMGProvider wsUrl="ws://192.168.4.1:8081">
+        <EMGProvider wsUrl="ws://localhost:8081">
           <Router>
             <AuthenticatedApp />
           </Router>

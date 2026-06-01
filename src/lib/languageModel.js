@@ -30,11 +30,11 @@
 const ALPHABET = Array.from("abcdefghijklmnñopqrstuvwxyzáéíóúü ");
 
 const CORPUS_FILES = [
-  "/corpus/arbol.txt",
-  "/corpus/donQuijote.txt",
-  "/corpus/fortunata.txt",
   "/corpus/mexico.txt",
   "/corpus/mexico2.txt",
+  "/corpus/mexico3.txt",
+  "/corpus/shrek.txt",
+  "/corpus/huevos.txt"
 ];
 
 const DICTIONARY_FILE = "/corpus/diccionario.txt";
