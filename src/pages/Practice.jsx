@@ -510,7 +510,7 @@ function ExerciseList({ exercises, completedIds, onStart, wsUrl, enabled = true 
 export default function Practice() {
   const [active, setActive] = useState(null);
   const [completedIds, setCompletedIds] = useState(new Set());
-  const wsUrl = "ws://localhost:8081";
+  const wsUrl = "ws://192.168.4.1:8081";
 
   const handleStart = (ex) => setActive(ex);
   const handleComplete = (id) => setCompletedIds((s) => new Set([...s, id]));
