@@ -1,32 +1,4 @@
 // src/lib/languageModel.js
-//
-// CAMBIOS vs versión anterior — respaldados por literatura:
-//
-// 1. KNESER-NEY interpolado reemplaza Add-k (ADD_K eliminado)
-//    → Chen & Goodman 1999; Jurafsky & Martin SLP3 cap.3; Wikipedia Kneser-Ney 2025
-//    → Considerado universalmente el mejor suavizado para n-gramas; evita el
-//      problema de "Francisco" (alta frecuencia unigrama en contexto único)
-//      que distorsionaba las predicciones con Add-k.
-//
-// 2. 4-gramas de caracteres añadidos
-//    → Jurafsky & Martin SLP3; Heidelberg SMT 2015 (perplexity baja con 4-gram)
-//    → El español tiene morfología flexiva rica ("ción","ando","emos") que se
-//      captura mejor con ventana de 4 caracteres.
-//
-// 3. Tri-gramas de palabras con backoff a bi-gramas
-//    → Trnka & McCoy 2008 (52.1% KSR con modelo avanzado de contexto)
-//    → ResearchGate AAC evaluation 2020; arxiv 2006.12040
-//    → El contexto de 2 palabras previas es clave en español (SVO + artículos)
-//
-// 4. WORD_SCORE_WEIGHTS rebalanceados: prefixRatio subió de 0.15 → 0.32
-//    → Trnka et al. 2007 NAACL: para usuarios con entrada lenta (AAC/EMG),
-//      sugerencias que aparecen pronto (pocos caracteres escritos) son más
-//      valiosas que frecuencia pura. logFreq bajó de 0.45 → 0.28.
-//
-// 5. LAMBDAS ajustados para 4-gramas con pendiente suavizada
-//    → Interpolated Modified Kneser-Ney: mejor perplexity que fixed lambdas
-//      (Heidelberg 2015: perplexity 54.0 vs 59.3 con fixed)
-
 const ALPHABET = Array.from("abcdefghijklmnñopqrstuvwxyzáéíóúü ");
 
 const CORPUS_FILES = [
@@ -458,9 +430,12 @@ export function isLanguageModelReady() {
 export function getTopLetters(text = "", topN = 5) {
   if (!MODEL_READY) return [];
 
-  const cleaned      = cleanText(text);
-  const currentWord  = getCurrentWord(text);
-  const prefixModel  = getNextLetterDistributionFromPrefix(currentWord);
+  const cleaned     = cleanText(text);
+  const currentWord = getCurrentWord(text);
+  const endsInSpace = text.length > 0 && text[text.length - 1] === " ";
+
+  // Si termina en espacio, no usar modelo de prefijo — predecir inicio de nueva palabra
+  const prefixModel = endsInSpace ? null : getNextLetterDistributionFromPrefix(currentWord);
 
   const results = [];
 
@@ -472,13 +447,20 @@ export function getTopLetters(text = "", topN = 5) {
       LETTER_WORD_BLEND.charModel * charProb +
       LETTER_WORD_BLEND.wordModel * wordProb;
 
+    // Penalizar espacio si estamos en medio de una palabra
     if (
       currentWord &&
+      !endsInSpace &&
       letter === " " &&
       prefixModel &&
       prefixModel.candidates.some((c) => c.word.length > currentWord.length)
     ) {
       finalProb *= SPACE_PENALTY_WHEN_IN_WORD;
+    }
+
+    // Penalizar doble espacio
+    if (endsInSpace && letter === " ") {
+      finalProb *= 0.05;
     }
 
     results.push({ letter, prob: finalProb, charProb, wordProb });

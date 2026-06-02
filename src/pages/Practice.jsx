@@ -4,6 +4,7 @@ import Keyboard from "@/components/writer/Keyboard";
 import TopLetters from "@/components/writer/TopLetters";
 import SuggestionsSidebar from "@/components/writer/SuggestionsSidebar";
 import MobileDictionary from "@/components/writer/MobileDictionary";
+import { getTopLetters, getSuggestedWords, isLanguageModelReady } from "@/lib/languageModel";
 import {
   Dumbbell, Sparkles, Trophy, Star, CheckCircle2,
   RotateCcw, Zap, ArrowLeft, Target, Clock, MousePointerClick, Percent
@@ -205,13 +206,20 @@ function ActiveExercise({ exercise, wsUrl, onClose, onComplete }) {
   const activeRows = numMode ? NUM_ROWS : LETTER_ROWS;
 
   const topLettersData = useMemo(() => {
-    const last = typed.slice(-1).toLowerCase();
-    const follow = { a:["r","n","l","s","d"], e:["n","r","s","l","d"], o:["s","n","r","l","m"], n:["a","e","o","t","i"], s:["e","a","o","i","u"], r:["a","e","o","i","u"] };
-    const letters = (follow[last] || ["e","a","o","s","r"]);
-    return letters.map((l) => ({ letter: l, percent: 20 }));
+    if (!isLanguageModelReady()) {
+      // Fallback si el modelo no está listo
+      const last = typed.slice(-1).toLowerCase();
+      const follow = { a:["r","n","l","s","d"], e:["n","r","s","l","d"], o:["s","n","r","l","m"], n:["a","e","o","t","i"], s:["e","a","o","i","u"], r:["a","e","o","i","u"] };
+      return (follow[last] || ["e","a","o","s","r"]).map((l) => ({ letter: l, percent: 20 }));
+    }
+    return getTopLetters(typed, 5);
   }, [typed]);
 
-  const suggestionsData = exercise.suggestions.map((w) => ({ word: w }));
+  const suggestionsData = useMemo(() => {
+    if (!isLanguageModelReady()) return exercise.suggestions.map((w) => ({ word: w }));
+    const modelWords = getSuggestedWords(typed, 8);
+    return modelWords.length > 0 ? modelWords : exercise.suggestions.map((w) => ({ word: w }));
+  }, [typed, exercise.suggestions]);
 
   const handleType = (ch) => {
     clicks.current++;
@@ -510,7 +518,7 @@ function ExerciseList({ exercises, completedIds, onStart, wsUrl, enabled = true 
 export default function Practice() {
   const [active, setActive] = useState(null);
   const [completedIds, setCompletedIds] = useState(new Set());
-  const wsUrl = "ws://192.168.4.1:8081";
+  const wsUrl = "ws://localhost:8081";
 
   const handleStart = (ex) => setActive(ex);
   const handleComplete = (id) => setCompletedIds((s) => new Set([...s, id]));
