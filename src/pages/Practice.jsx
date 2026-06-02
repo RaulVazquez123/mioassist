@@ -4,7 +4,7 @@ import Keyboard from "@/components/writer/Keyboard";
 import TopLetters from "@/components/writer/TopLetters";
 import SuggestionsSidebar from "@/components/writer/SuggestionsSidebar";
 import MobileDictionary from "@/components/writer/MobileDictionary";
-import { getTopLetters, getSuggestedWords, isLanguageModelReady } from "@/lib/languageModel";
+import { getTopLetters, getSuggestedWords, isLanguageModelReady, loadLanguageModel } from "@/lib/languageModel";
 import {
   Dumbbell, Sparkles, Trophy, Star, CheckCircle2,
   RotateCcw, Zap, ArrowLeft, Target, Clock, MousePointerClick, Percent
@@ -199,6 +199,13 @@ function ActiveExercise({ exercise, wsUrl, onClose, onComplete }) {
   const totalChars = useRef(0);
   const correctChars = useRef(0);
   const [stats, setStats] = useState(null);
+  const [modelReady, setModelReady] = useState(isLanguageModelReady());
+
+  useEffect(() => {
+    if (!isLanguageModelReady()) {
+      loadLanguageModel().then(() => setModelReady(true));
+    }
+  }, []);
 
   const target = exercise.phrases[step] || "";
   const isMatch = typed.trim().toLowerCase() === target.toLowerCase();
@@ -206,20 +213,19 @@ function ActiveExercise({ exercise, wsUrl, onClose, onComplete }) {
   const activeRows = numMode ? NUM_ROWS : LETTER_ROWS;
 
   const topLettersData = useMemo(() => {
-    if (!isLanguageModelReady()) {
-      // Fallback si el modelo no está listo
+    if (!modelReady) {
       const last = typed.slice(-1).toLowerCase();
       const follow = { a:["r","n","l","s","d"], e:["n","r","s","l","d"], o:["s","n","r","l","m"], n:["a","e","o","t","i"], s:["e","a","o","i","u"], r:["a","e","o","i","u"] };
       return (follow[last] || ["e","a","o","s","r"]).map((l) => ({ letter: l, percent: 20 }));
     }
     return getTopLetters(typed, 5);
-  }, [typed]);
+  }, [typed, modelReady]);
 
   const suggestionsData = useMemo(() => {
-    if (!isLanguageModelReady()) return exercise.suggestions.map((w) => ({ word: w }));
+    if (!modelReady) return exercise.suggestions.map((w) => ({ word: w }));
     const modelWords = getSuggestedWords(typed, 8);
     return modelWords.length > 0 ? modelWords : exercise.suggestions.map((w) => ({ word: w }));
-  }, [typed, exercise.suggestions]);
+  }, [typed, exercise.suggestions, modelReady]);
 
   const handleType = (ch) => {
     clicks.current++;
@@ -232,7 +238,13 @@ function ActiveExercise({ exercise, wsUrl, onClose, onComplete }) {
   const handleClear = () => setTyped("");
   const handleSpace = () => { clicks.current++; setTyped((t) => t + " "); };
   const handlePickWord = (w) => { setTyped((t) => (t.endsWith(" ") || t === "" ? t + w + " " : t + " " + w + " ")); setMobileDictOpen(false); };
-  const openDictionary = () => setMobileDictOpen(true);
+  const [emgDictIndex, setEmgDictIndex] = useState(0);
+
+  const openDictionary = () => {
+    setMobileDictOpen(true);
+    setEmgZona("dictionary");
+    setEmgDictIndex(0);
+  };
 
   const ejecutarTecla = (value) => {
     if (value === "ESPACIO")     return handleSpace();
@@ -262,13 +274,17 @@ function ActiveExercise({ exercise, wsUrl, onClose, onComplete }) {
 
   // EMG navigation
   const stateRef = useRef({});
-  stateRef.current = { filaBlockeada, emgZona, kbRow, kbCol, emgTopIndex, showExitConfirm, exitConfirmOption, topLettersData, suggestionsData };
+  stateRef.current = { filaBlockeada, emgZona, kbRow, kbCol, emgTopIndex, showExitConfirm, exitConfirmOption, topLettersData, suggestionsData, emgDictIndex };
 
   useEMGSimple(wsUrl,
     // DERECHA
     () => {
       const s = stateRef.current;
       if (s.showExitConfirm) { setExitConfirmOption((o) => o === 0 ? 1 : 0); return; }
+      if (s.emgZona === "dictionary") {
+        setEmgDictIndex((i) => (i + 1 >= s.suggestionsData.length ? 0 : i + 1));
+        return;
+      }
       if (s.emgZona === "top") {
         if (!s.filaBlockeada) { setEmgZona("keyboard"); setKbRow(0); setKbCol(0); }
         else { setEmgTopIndex((i) => (i + 1 >= 6 ? 0 : i + 1)); }
@@ -289,6 +305,13 @@ function ActiveExercise({ exercise, wsUrl, onClose, onComplete }) {
       if (s.showExitConfirm) {
         if (s.exitConfirmOption === 0) { onClose(); }
         else { setShowExitConfirm(false); }
+        return;
+      }
+      if (s.emgZona === "dictionary") {
+        const palabra = s.suggestionsData[s.emgDictIndex]?.word;
+        if (palabra) handlePickWord(palabra);
+        setEmgZona("top");
+        setEmgDictIndex(0);
         return;
       }
       if (s.emgZona === "top") {
@@ -436,11 +459,23 @@ function ActiveExercise({ exercise, wsUrl, onClose, onComplete }) {
               </button>
             </div>
             <div className="hidden xl:block">
-              <SuggestionsSidebar suggestions={exercise.suggestions} onPick={handlePickWord} highlighted={false} />
+              <SuggestionsSidebar
+                suggestions={suggestionsData}
+                onPick={handlePickWord}
+                highlighted={emgZona === "dictionary"}
+                zona={emgZona === "dictionary" ? "suggestions" : undefined}
+                suggestionIndex={emgDictIndex}
+              />
             </div>
           </div>
           <div className="xl:hidden">
-            <SuggestionsSidebar suggestions={exercise.suggestions} onPick={handlePickWord} highlighted={false} />
+            <SuggestionsSidebar
+              suggestions={suggestionsData}
+              onPick={handlePickWord}
+              highlighted={emgZona === "dictionary"}
+              zona={emgZona === "dictionary" ? "suggestions" : undefined}
+              suggestionIndex={emgDictIndex}
+            />
           </div>
         </div>
       </div>
