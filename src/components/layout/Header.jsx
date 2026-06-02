@@ -33,7 +33,7 @@ export default function Header({ zona, headerIndex = 0 }) {
   stateRef.current = { emgIndex, confirmOpen, confirmOption };
 
   useEffect(() => {
-    if (isWriter) { releaseEMG("header"); return; }
+    if (isWriter || pathname === "/profile") { releaseEMG("header"); return; }
 
     console.log("[EMG] Header haciendo claimEMG"); claimEMG("header",
       () => {
@@ -57,6 +57,8 @@ export default function Header({ zona, headerIndex = 0 }) {
         if (emgIndex !== null) { setConfirmOpen(true); setConfirmOption(0); }
       }
     );
+    return () => releaseEMG("header");
+    return () => releaseEMG("header");
   }, [isWriter, pathname]);
 
   const handleLogout = () => logout();

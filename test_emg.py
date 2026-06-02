@@ -88,7 +88,7 @@ class Botones(BaseHTTPRequestHandler):
 
 def await_reset():
     import time
-    time.sleep(0.15)
+    time.sleep(0.5)
     asyncio.run_coroutine_threadsafe(enviar_a_todos(REPOSO), loop_global)
 
 async def ws_handler(ws):

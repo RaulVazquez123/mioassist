@@ -119,7 +119,7 @@ export default function InfoPage() {
         else handleDownload(DOC_GUIA, "MioAssist_Guia_Uso_2026.txt");
       }
     },
-    wsUrl: "ws://localhost:8081",
+    wsUrl: "ws://192.168.4.1:8081",
     ownerId: "infopage",
   });
 

@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import Header from "@/components/layout/Header";
+import React, { useState, useRef, useEffect } from "react";
+// import Header from "@/components/layout/Header"; // comentado temporalmente
 import StatCard from "@/components/profile/StatCard";
 import FatigueMeter from "@/components/profile/FatigueMeter";
 import SignalGauge from "@/components/profile/SignalGauge";
@@ -17,13 +17,43 @@ const TABS = [
   { id: "user",    label: "Datos del paciente", icon: User },
 ];
 
-// Bloques: 0=tab métricas, 1=tab datos, 2=botón descargar, 3=botón generar reporte
 const BLOCK_COUNT = 4;
+const WS_URL = "ws://192.168.4.1:8081";
+
+// Hook EMG simple propio — no depende del contexto
+function useEMGSimple(onDer, onIzq) {
+  const ws = useRef(null);
+  const cbRef = useRef({ onDer, onIzq });
+  cbRef.current = { onDer, onIzq };
+
+  useEffect(() => {
+    let last = 0;
+    const DEBOUNCE = 800;
+    ws.current = new WebSocket(WS_URL);
+    ws.current.onmessage = (e) => {
+      const now = Date.now();
+      if (now - last < DEBOUNCE) return;
+      try {
+        const data = JSON.parse(e.data);
+        const izq = data.izq?.click === 1;
+        const der = data.der?.click === 1;
+        if (!izq && !der) return;
+        if (izq && der) return;
+        last = now;
+        if (der) cbRef.current.onDer();
+        if (izq) cbRef.current.onIzq();
+      } catch {}
+    };
+    ws.current.onerror = () => {};
+    ws.current.onclose = () => {};
+    return () => ws.current?.close();
+  }, []);
+}
 
 export default function Profile() {
   const [tab, setTab] = useState("metrics");
-  const { rmsActual, pico, connected, claimEMG, releaseEMG } = useEMG();
-  const [activeBlock, setActiveBlock] = useState(-1);
+  const { rmsActual, pico, connected } = useEMG();
+  const [activeBlock, setActiveBlock] = useState(0);
 
   const [sessionStart] = useState(Date.now());
   const [now, setNow] = React.useState(Date.now());
@@ -37,46 +67,31 @@ export default function Profile() {
   const avgRms  = connected && rmsActual > 0 ? Math.round(rmsActual) : 68;
   const picoRms = connected && pico > 0      ? Math.round(pico)      : 118;
 
-  const stateRef = React.useRef({});
-  stateRef.current = { activeBlock };
+  const stateRef = useRef({});
+  stateRef.current = { activeBlock, tab };
 
-  React.useEffect(() => {
-    if (activeBlock === -1) {
-      releaseEMG("profile");
-      return;
+  useEMGSimple(
+    // Derecha — siguiente bloque
+    () => setActiveBlock((b) => (b + 1 >= BLOCK_COUNT ? 0 : b + 1)),
+    // Izquierda — ejecuta acción
+    () => {
+      const { activeBlock } = stateRef.current;
+      if (activeBlock === 0) setTab("metrics");
+      if (activeBlock === 1) setTab("user");
+      if (activeBlock === 2) document.getElementById("profile-btn-download")?.click();
+      if (activeBlock === 3) document.getElementById("profile-btn-report")?.click();
     }
-    claimEMG("profile",
-      () => {
-        setActiveBlock((b) => {
-          if (b >= BLOCK_COUNT - 1) return -1;
-          return b + 1;
-        });
-      },
-      () => {
-        const { activeBlock } = stateRef.current;
-        if (activeBlock === 0) setTab("metrics");
-        if (activeBlock === 1) setTab("user");
-        if (activeBlock === 2) document.getElementById("profile-btn-download")?.click();
-        if (activeBlock === 3) document.getElementById("profile-btn-report")?.click();
-      }
-    );
-  }, [activeBlock]);
-
-  React.useEffect(() => {
-    return () => releaseEMG("profile");
-  }, []);
+  );
 
   // Scroll to active block
   React.useEffect(() => {
-    if (activeBlock >= 0) {
-      const el = document.getElementById(`emg-block-${activeBlock}`);
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
+    const el = document.getElementById(`emg-block-${activeBlock}`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [activeBlock]);
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
+      {/* <Header /> comentado temporalmente */}
       <main className="max-w-[1600px] mx-auto px-4 sm:px-8 py-8 lg:py-12">
 
         <div className="mb-8">
@@ -90,7 +105,7 @@ export default function Profile() {
           </h2>
         </div>
 
-        {/* Tabs — bloques 0 y 1 */}
+        {/* Tabs */}
         <div className="flex gap-2 p-1 rounded-2xl bg-secondary/70 border border-border/60 w-fit mb-8">
           {TABS.map(({ id, label, icon: Icon }, i) => (
             <button
@@ -125,7 +140,6 @@ export default function Profile() {
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <div className="lg:col-span-2"><ProgressChart /></div>
-              {/* CloudExport con botones marcados — bloques 2 y 3 */}
               <CloudExport
                 activeBlock={activeBlock}
                 downloadBtnId="profile-btn-download"
