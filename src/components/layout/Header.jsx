@@ -33,12 +33,9 @@ export default function Header({ zona, headerIndex = 0 }) {
   stateRef.current = { emgIndex, confirmOpen, confirmOption };
 
   useEffect(() => {
-    if (isWriter) {
-      releaseEMG("header");
-      return;
-    }
+    if (isWriter) { releaseEMG("header"); return; }
 
-    claimEMG("header",
+    console.log("[EMG] Header haciendo claimEMG"); claimEMG("header",
       () => {
         const { confirmOpen } = stateRef.current;
         if (confirmOpen) { setConfirmOption((o) => o === 0 ? 1 : 0); return; }
@@ -60,8 +57,6 @@ export default function Header({ zona, headerIndex = 0 }) {
         if (emgIndex !== null) { setConfirmOpen(true); setConfirmOption(0); }
       }
     );
-
-    return () => releaseEMG("header");  // ← FIX: libera el claim al salir de la página
   }, [isWriter, pathname]);
 
   const handleLogout = () => logout();

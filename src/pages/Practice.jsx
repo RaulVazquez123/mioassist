@@ -38,37 +38,6 @@ const NUM_ROWS = [
   ["SALIR"],
 ];
 
-// Hook EMG simple reutilizable
-function useEMGSimple(wsUrl, onDer, onIzq, enabled = true) {
-  const ws = useRef(null);
-  const stateRef = useRef({ onDer, onIzq });
-  stateRef.current = { onDer, onIzq };
-
-  useEffect(() => {
-    if (!enabled) return;
-    let ultimaAccion = 0;
-    const DEBOUNCE_MS = 800;
-    ws.current = new WebSocket(wsUrl);
-    ws.current.onmessage = (event) => {
-      const ahora = Date.now();
-      if (ahora - ultimaAccion < DEBOUNCE_MS) return;
-      try {
-        const data = JSON.parse(event.data);
-        const clickIzq = data.izq?.click === 1;
-        const clickDer = data.der?.click === 1;
-        if (!clickIzq && !clickDer) return;
-        if (clickIzq && clickDer) return;
-        ultimaAccion = ahora;
-        if (clickDer) stateRef.current.onDer();
-        if (clickIzq) stateRef.current.onIzq();
-      } catch (e) {}
-    };
-    ws.current.onerror = () => {};
-    ws.current.onclose = () => {};
-    return () => ws.current?.close();
-  }, [wsUrl, enabled]);
-}
-
 /* ─── CONFIRM DIALOG ─── */
 function ConfirmDialog({ title, subtitle, onConfirm, onCancel, confirmOption, setConfirmOption }) {
   return (
@@ -99,14 +68,18 @@ function StatsScreen({ stats, exercise, onRepeat, onAnother, onClose }) {
   const mins = Math.floor(stats.seconds / 60);
   const secs = stats.seconds % 60;
   const [selectedBtn, setSelectedBtn] = useState(0);
-  const actions = [onRepeat, onAnother, onClose];
   const actionsRef = useRef({});
-  actionsRef.current = { selectedBtn, actions };
+  actionsRef.current = { selectedBtn, onRepeat, onAnother, onClose };
 
   useEffect(() => {
     claimEMG("statsscreen",
       () => setSelectedBtn((i) => (i + 1) % 3),
-      () => actionsRef.current.actions[actionsRef.current.selectedBtn]()
+      () => {
+        const s = actionsRef.current;
+        if (s.selectedBtn === 0) s.onRepeat();
+        else if (s.selectedBtn === 1) s.onAnother();
+        else s.onClose();
+      }
     );
     return () => releaseEMG("statsscreen");
   }, []);
@@ -120,8 +93,6 @@ function StatsScreen({ stats, exercise, onRepeat, onAnother, onClose }) {
   return (
     <div className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-center px-6">
       <div className="w-full max-w-md space-y-6 text-center">
-
-        {/* Trophy */}
         <div className="flex flex-col items-center gap-3">
           <div className="w-20 h-20 rounded-full bg-emerald-500/10 flex items-center justify-center">
             <Trophy className="w-10 h-10 text-emerald-500" />
@@ -131,8 +102,6 @@ function StatsScreen({ stats, exercise, onRepeat, onAnother, onClose }) {
             <p className="text-muted-foreground mt-1">{exercise.emoji} <span className="font-semibold text-foreground">{exercise.title}</span></p>
           </div>
         </div>
-
-        {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
           <div className="rounded-2xl border border-border/70 bg-card p-5 flex flex-col items-center gap-2">
             <Clock className="w-6 h-6 text-primary" />
@@ -150,35 +119,18 @@ function StatsScreen({ stats, exercise, onRepeat, onAnother, onClose }) {
             <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Precisión</span>
           </div>
         </div>
-
-        {/* Buttons */}
         <div className="flex gap-3">
-          <button
-            onClick={onRepeat}
-            style={btnStyle(0)}
-            className="flex-1 h-14 rounded-2xl border-2 border-border font-semibold text-sm flex items-center justify-center gap-2 transition-all"
-          >
+          <button onClick={onRepeat} style={btnStyle(0)} className="flex-1 h-14 rounded-2xl border-2 border-border font-semibold text-sm flex items-center justify-center gap-2 transition-all">
             <RotateCcw className="w-4 h-4" /> Repetir
           </button>
-          <button
-            onClick={onAnother}
-            style={btnStyle(1)}
-            className="flex-1 h-14 rounded-2xl border-2 border-border font-semibold text-sm flex items-center justify-center gap-2 transition-all"
-          >
+          <button onClick={onAnother} style={btnStyle(1)} className="flex-1 h-14 rounded-2xl border-2 border-border font-semibold text-sm flex items-center justify-center gap-2 transition-all">
             <Dumbbell className="w-4 h-4" /> Otro
           </button>
-          <button
-            onClick={onClose}
-            style={btnStyle(2)}
-            className="flex-1 h-14 rounded-2xl border-2 border-primary bg-primary text-primary-foreground font-semibold text-sm flex items-center justify-center gap-2 transition-all"
-          >
+          <button onClick={onClose} style={btnStyle(2)} className="flex-1 h-14 rounded-2xl border-2 border-primary bg-primary text-primary-foreground font-semibold text-sm flex items-center justify-center gap-2 transition-all">
             Volver
           </button>
         </div>
-
-        <p className="text-[11px] text-muted-foreground">
-          Derecha → navega · Izquierda → selecciona
-        </p>
+        <p className="text-[11px] text-muted-foreground">Derecha → navega · Izquierda → selecciona</p>
       </div>
     </div>
   );
@@ -278,7 +230,6 @@ function ActiveExercise({ exercise, onClose, onComplete }) {
     }
   };
 
-  // EMG navigation
   const stateRef = useRef({});
   stateRef.current = { filaBlockeada, emgZona, kbRow, kbCol, emgTopIndex, showExitConfirm, exitConfirmOption, topLettersData, suggestionsData, emgDictIndex };
 
@@ -452,7 +403,6 @@ function ActiveExercise({ exercise, onClose, onComplete }) {
                 onShiftChange={setShift}
                 onNumModeChange={setNumMode}
               />
-              {/* Botón salir con confirmación — resaltado cuando EMG llega a esa fila */}
               <button
                 onClick={() => { setShowExitConfirm(true); setExitConfirmOption(0); }}
                 style={
@@ -499,33 +449,53 @@ function ExerciseList({ exercises, completedIds, onStart, enabled = true }) {
   const [selectedIdx, setSelectedIdx] = useState(null);
   const [confirmMode, setConfirmMode] = useState(false);
   const [confirmOption, setConfirmOption] = useState(0);
+
+  // Guardamos TODO lo necesario en el ref para evitar closures stale
   const stateRef = useRef({});
-  stateRef.current = { selectedIdx, confirmMode, confirmOption };
+  stateRef.current = { selectedIdx, confirmMode, confirmOption, onStart, exercises };
 
   useEffect(() => {
-    if (!enabled) { releaseEMG("exerciselist"); return; }
+    console.log("[EMG] ExerciseList montó, enabled:", enabled);
+    if (!enabled) {
+      console.log("[EMG] ExerciseList releasing porque enabled=false");
+      releaseEMG("exerciselist");
+      return;
+    }
 
-    claimEMG("exerciselist",
-      () => {
-        const s = stateRef.current;
-        if (s.confirmMode) { setConfirmOption((o) => o === 0 ? 1 : 0); return; }
-        setSelectedIdx((i) => { if (i === null) return 0; return (i + 1) >= exercises.length ? 0 : i + 1; });
-      },
-      () => {
-        const s = stateRef.current;
-        if (s.confirmMode) {
-          if (s.confirmOption === 0) { setConfirmMode(false); onStart(exercises[s.selectedIdx]); }
-          else { setConfirmMode(false); setConfirmOption(0); }
-          return;
+    const t = setTimeout(() => {
+      console.log("[EMG] ExerciseList haciendo claimEMG");
+      claimEMG(
+        "exerciselist",
+        () => {
+          console.log("[EMG] DER recibido en ExerciseList");
+          const s = stateRef.current;
+          if (s.confirmMode) { setConfirmOption((o) => (o === 0 ? 1 : 0)); return; }
+          setSelectedIdx((i) => {
+            if (i === null) return 0;
+            return i + 1 >= s.exercises.length ? 0 : i + 1;
+          });
+        },
+        () => {
+          console.log("[EMG] IZQ recibido en ExerciseList");
+          const s = stateRef.current;
+          if (s.confirmMode) {
+            if (s.confirmOption === 0) { setConfirmMode(false); s.onStart(s.exercises[s.selectedIdx]); }
+            else { setConfirmMode(false); setConfirmOption(0); }
+            return;
+          }
+          if (s.selectedIdx !== null) { setConfirmMode(true); setConfirmOption(0); }
         }
-        if (s.selectedIdx !== null) { setConfirmMode(true); setConfirmOption(0); }
-      }
-    );
+      );
+    }, 50);
 
-    return () => releaseEMG("exerciselist");
+    return () => { clearTimeout(t); releaseEMG("exerciselist"); };
   }, [enabled]);
 
-  const levelStyle = (level) => ({ Básico: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20", Intermedio: "bg-amber-500/10 text-amber-700 border-amber-500/20", Avanzado: "bg-primary/10 text-primary border-primary/20" }[level]);
+  const levelStyle = (level) => ({
+    Básico: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20",
+    Intermedio: "bg-amber-500/10 text-amber-700 border-amber-500/20",
+    Avanzado: "bg-primary/10 text-primary border-primary/20"
+  }[level]);
 
   return (
     <div className="relative">
@@ -535,13 +505,17 @@ function ExerciseList({ exercises, completedIds, onStart, enabled = true }) {
           subtitle={`${exercises[selectedIdx].level} · ${exercises[selectedIdx].duration} — ¿Iniciar este ejercicio?`}
           confirmOption={confirmOption}
           setConfirmOption={setConfirmOption}
-          onConfirm={() => onStart(exercises[selectedIdx])}
+          onConfirm={() => { setConfirmMode(false); stateRef.current.onStart(exercises[selectedIdx]); }}
           onCancel={() => { setConfirmMode(false); setConfirmOption(0); }}
         />
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {exercises.map((ex, idx) => (
-          <div key={ex.id} style={selectedIdx === idx ? { borderColor: "#38bdf8", boxShadow: "0 0 0 2px #38bdf8" } : {}} className="group rounded-3xl border border-border/70 bg-card p-6 soft-shadow hover:border-accent/50 transition-all flex flex-col">
+          <div
+            key={ex.id}
+            style={selectedIdx === idx ? { borderColor: "#38bdf8", boxShadow: "0 0 0 2px #38bdf8" } : {}}
+            className="group rounded-3xl border border-border/70 bg-card p-6 soft-shadow hover:border-accent/50 transition-all flex flex-col"
+          >
             <div className="flex items-start justify-between mb-4">
               <span className={cn("text-[10px] uppercase tracking-wider font-semibold px-2.5 py-1 rounded-full border", levelStyle(ex.level))}>{ex.level}</span>
               {completedIds.has(ex.id) && <CheckCircle2 className="w-5 h-5 text-emerald-500" />}
