@@ -1,11 +1,16 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
-import Header from "@/components/layout/Header";
+import React, { useEffect, useMemo, useState, useRef } from "react";
+// import Header from "@/components/layout/Header"; // comentado temporalmente
 import Keyboard from "@/components/writer/Keyboard";
 import TopLetters from "@/components/writer/TopLetters";
 import SuggestionsSidebar from "@/components/writer/SuggestionsSidebar";
 import MobileDictionary from "@/components/writer/MobileDictionary";
-import { getTopLetters, getSuggestedWords, isLanguageModelReady, loadLanguageModel } from "@/lib/languageModel";
-import { useEMG } from "@/lib/EMGContext";
+import { useEMGKeyboard } from "@/hooks/useEMGKeyboard";
+import {
+  loadLanguageModel,
+  getTopLetters,
+  getSuggestedWords,
+  isLanguageModelReady,
+} from "@/lib/languageModel";
 import {
   Dumbbell, Sparkles, Trophy, Star, CheckCircle2,
   RotateCcw, Zap, ArrowLeft, Target, Clock, MousePointerClick, Percent
@@ -38,8 +43,39 @@ const NUM_ROWS = [
   ["SALIR"],
 ];
 
+// Hook EMG simple — propio WebSocket, sin depender del contexto
+function useEMGSimple(wsUrl, onDer, onIzq, enabled = true) {
+  const ws = useRef(null);
+  const cbRef = useRef({ onDer, onIzq });
+  cbRef.current = { onDer, onIzq };
+
+  useEffect(() => {
+    if (!enabled) { ws.current?.close(); return; }
+    let last = 0;
+    const DEBOUNCE = 800;
+    ws.current = new WebSocket(wsUrl);
+    ws.current.onmessage = (e) => {
+      const now = Date.now();
+      if (now - last < DEBOUNCE) return;
+      try {
+        const data = JSON.parse(e.data);
+        const izq = data.izq?.click === 1;
+        const der = data.der?.click === 1;
+        if (!izq && !der) return;
+        if (izq && der) return;
+        last = now;
+        if (der) cbRef.current.onDer();
+        if (izq) cbRef.current.onIzq();
+      } catch {}
+    };
+    ws.current.onerror = () => {};
+    ws.current.onclose = () => {};
+    return () => ws.current?.close();
+  }, [wsUrl, enabled]);
+}
+
 /* ─── CONFIRM DIALOG ─── */
-function ConfirmDialog({ title, subtitle, onConfirm, onCancel, confirmOption, setConfirmOption }) {
+function ConfirmDialog({ title, subtitle, onConfirm, onCancel, confirmOption }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
       <div className="bg-card rounded-3xl border border-border p-8 max-w-sm w-full soft-shadow text-center space-y-5">
@@ -64,25 +100,21 @@ function ConfirmDialog({ title, subtitle, onConfirm, onCancel, confirmOption, se
 
 /* ─── STATS SCREEN ─── */
 function StatsScreen({ stats, exercise, onRepeat, onAnother, onClose }) {
-  const { claimEMG, releaseEMG } = useEMG();
   const mins = Math.floor(stats.seconds / 60);
   const secs = stats.seconds % 60;
   const [selectedBtn, setSelectedBtn] = useState(0);
-  const actionsRef = useRef({});
-  actionsRef.current = { selectedBtn, onRepeat, onAnother, onClose };
+  const cbRef = useRef({ onRepeat, onAnother, onClose, selectedBtn });
+  cbRef.current = { onRepeat, onAnother, onClose, selectedBtn };
 
-  useEffect(() => {
-    claimEMG("statsscreen",
-      () => setSelectedBtn((i) => (i + 1) % 3),
-      () => {
-        const s = actionsRef.current;
-        if (s.selectedBtn === 0) s.onRepeat();
-        else if (s.selectedBtn === 1) s.onAnother();
-        else s.onClose();
-      }
-    );
-    return () => releaseEMG("statsscreen");
-  }, []);
+  useEMGSimple("ws://192.168.4.1:8081",
+    () => setSelectedBtn((i) => (i + 1) % 3),
+    () => {
+      const { selectedBtn, onRepeat, onAnother, onClose } = cbRef.current;
+      if (selectedBtn === 0) onRepeat();
+      else if (selectedBtn === 1) onAnother();
+      else onClose();
+    }
+  );
 
   const btnStyle = (idx) => selectedBtn === idx
     ? { backgroundColor: "#7dd3fc", borderColor: "#38bdf8", boxShadow: "0 0 0 2px #38bdf8", color: "#0f172a" }
@@ -144,28 +176,35 @@ function ActiveExercise({ exercise, onClose, onComplete }) {
   const [mobileDictOpen, setMobileDictOpen] = useState(false);
   const [shift, setShift] = useState(true);
   const [numMode, setNumMode] = useState(false);
-  const [filaBlockeada, setFilaBloqueada] = useState(false);
-  const [kbRow, setKbRow] = useState(0);
-  const [kbCol, setKbCol] = useState(0);
-  const [emgZona, setEmgZona] = useState("top");
-  const [emgTopIndex, setEmgTopIndex] = useState(0);
+  const [modelReady, setModelReady] = useState(isLanguageModelReady());
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [exitConfirmOption, setExitConfirmOption] = useState(0);
+
+  const [filaBlockeada, setFilaBloqueada] = useState(false);
+  const [emgZona, setEmgZona] = useState("top");
+  const [emgTopIndex, setEmgTopIndex] = useState(0);
+  const [emgDictIndex, setEmgDictIndex] = useState(0);
+  const [emgActionIndex, setEmgActionIndex] = useState(0);
+  const [kbRow, setKbRow] = useState(0);
+  const [kbCol, setKbCol] = useState(0);
+  const [zona, setZona] = useState("top");
+  const [topIndex, setTopIndex] = useState(0);
+  const [suggestionIndex, setSuggestionIndex] = useState(0);
 
   const startTime = useRef(Date.now());
   const clicks = useRef(0);
   const totalChars = useRef(0);
   const correctChars = useRef(0);
   const [stats, setStats] = useState(null);
-  const [modelReady, setModelReady] = useState(isLanguageModelReady());
+
+  const exitConfirmOptionRef = useRef(0);
+  exitConfirmOptionRef.current = exitConfirmOption;
 
   useEffect(() => {
-    if (!isLanguageModelReady()) {
-      loadLanguageModel().then(() => setModelReady(true));
-    }
+    if (!isLanguageModelReady()) loadLanguageModel().then(() => setModelReady(true));
   }, []);
 
-  const target = exercise.phrases[step] || "";
+  const target = exercise.phrases[step] ? exercise.phrases[step].charAt(0).toUpperCase() + exercise.phrases[step].slice(1) : "";
   const isMatch = typed.trim().toLowerCase() === target.toLowerCase();
   const totalSteps = exercise.phrases.length;
   const activeRows = numMode ? NUM_ROWS : LETTER_ROWS;
@@ -180,9 +219,10 @@ function ActiveExercise({ exercise, onClose, onComplete }) {
   }, [typed, modelReady]);
 
   const suggestionsData = useMemo(() => {
+    if (!typed.trim()) return [];
     if (!modelReady) return exercise.suggestions.map((w) => ({ word: w }));
     const modelWords = getSuggestedWords(typed, 8);
-    return modelWords.length > 0 ? modelWords : exercise.suggestions.map((w) => ({ word: w }));
+    return modelWords;
   }, [typed, exercise.suggestions, modelReady]);
 
   const handleType = (ch) => {
@@ -196,13 +236,7 @@ function ActiveExercise({ exercise, onClose, onComplete }) {
   const handleClear = () => setTyped("");
   const handleSpace = () => { clicks.current++; setTyped((t) => t + " "); };
   const handlePickWord = (w) => { setTyped((t) => (t.endsWith(" ") || t === "" ? t + w + " " : t + " " + w + " ")); setMobileDictOpen(false); };
-  const [emgDictIndex, setEmgDictIndex] = useState(0);
-
-  const openDictionary = () => {
-    setMobileDictOpen(true);
-    setEmgZona("dictionary");
-    setEmgDictIndex(0);
-  };
+  const openDictionary = () => { setMobileDictOpen(true); setEmgZona("dictionary"); setEmgDictIndex(0); };
 
   const ejecutarTecla = (value) => {
     if (value === "ESPACIO")     return handleSpace();
@@ -230,78 +264,43 @@ function ActiveExercise({ exercise, onClose, onComplete }) {
     }
   };
 
-  const stateRef = useRef({});
-  stateRef.current = { filaBlockeada, emgZona, kbRow, kbCol, emgTopIndex, showExitConfirm, exitConfirmOption, topLettersData, suggestionsData, emgDictIndex };
-
-  const { claimEMG, releaseEMG } = useEMG();
-
+  useEffect(() => { setTopIndex(emgTopIndex); }, [emgTopIndex]);
   useEffect(() => {
-    claimEMG("activeexercise",
-      () => {
-        const s = stateRef.current;
-        if (s.showExitConfirm) { setExitConfirmOption((o) => o === 0 ? 1 : 0); return; }
-        if (s.emgZona === "dictionary") {
-          setEmgDictIndex((i) => (i + 1 >= s.suggestionsData.length ? 0 : i + 1));
-          return;
-        }
-        if (s.emgZona === "top") {
-          if (!s.filaBlockeada) { setEmgZona("keyboard"); setKbRow(0); setKbCol(0); }
-          else { setEmgTopIndex((i) => (i + 1 >= 6 ? 0 : i + 1)); }
-        } else if (s.emgZona === "keyboard") {
-          if (!s.filaBlockeada) {
-            const maxRow = activeRows.length - 1;
-            if (s.kbRow >= maxRow) { setEmgZona("top"); setKbRow(0); setKbCol(0); }
-            else { setKbRow((r) => r + 1); setKbCol(0); }
-          } else {
-            const rowLen = activeRows[s.kbRow]?.length ?? 1;
-            setKbCol((c) => (c + 1 >= rowLen ? 0 : c + 1));
-          }
-        }
-      },
-      () => {
-        const s = stateRef.current;
-        if (s.showExitConfirm) {
-          if (s.exitConfirmOption === 0) { onClose(); }
-          else { setShowExitConfirm(false); }
-          return;
-        }
-        if (s.emgZona === "dictionary") {
-          const palabra = s.suggestionsData[s.emgDictIndex]?.word;
-          if (palabra) handlePickWord(palabra);
-          setEmgZona("top");
-          setEmgDictIndex(0);
-          return;
-        }
-        if (s.emgZona === "top") {
-          if (!s.filaBlockeada) { setFilaBloqueada(true); setEmgTopIndex(0); }
-          else {
-            const letra = s.topLettersData[s.emgTopIndex]?.letter;
-            if (letra) ejecutarTecla(letra);
-            setFilaBloqueada(false);
-            setEmgTopIndex(0);
-          }
-        } else if (s.emgZona === "keyboard") {
-          if (!s.filaBlockeada) { setFilaBloqueada(true); setKbCol(0); }
-          else {
-            const row = activeRows[s.kbRow];
-            if (row) {
-              const key = row[Math.min(s.kbCol, row.length - 1)];
-              if (key) ejecutarTecla(key);
-              if (!["SALIR","SHIFT","123","ESPACIO","BORRAR","LIMPIAR","DICCIONARIO"].includes(key)) {
-                setFilaBloqueada(false);
-                setEmgZona("top");
-                setKbRow(0); setKbCol(0);
-                setEmgTopIndex(0);
-              } else {
-                setFilaBloqueada(false);
-              }
-            }
-          }
-        }
-      }
-    );
-    return () => releaseEMG("activeexercise");
-  }, []);
+    if (emgZona === "top")        setZona("top");
+    if (emgZona === "keyboard")   setZona("keyboard");
+    if (emgZona === "dictionary") setZona("suggestions");
+  }, [emgZona]);
+  useEffect(() => { setSuggestionIndex(emgDictIndex); }, [emgDictIndex]);
+
+  // Hook principal del teclado — desactivado cuando el confirm de salir está abierto
+  useEMGKeyboard({
+    activeRows,
+    kbRow, setKbRow,
+    kbCol, setKbCol,
+    filaBlockeada, setFilaBloqueada,
+    emgZona, setEmgZona,
+    topIndex: emgTopIndex, setTopIndex: setEmgTopIndex,
+    dictIndex: emgDictIndex, setDictIndex: setEmgDictIndex,
+    actionIndex: emgActionIndex, setActionIndex: setEmgActionIndex,
+    topLettersData,
+    suggestionsData,
+    onSelectKey: ejecutarTecla,
+    onSelectWord: handlePickWord,
+    onOpenDictionary: openDictionary,
+    onExecuteAction: () => {},
+    wsUrl: showExitConfirm ? null : "ws://192.168.4.1:8081",
+  });
+
+  // Hook para el confirm de salir
+  useEMGSimple(
+    "ws://192.168.4.1:8081",
+    () => setExitConfirmOption((o) => o === 0 ? 1 : 0),
+    () => {
+      if (exitConfirmOptionRef.current === 0) { onClose(); }
+      else { setShowExitConfirm(false); setExitConfirmOption(0); }
+    },
+    showExitConfirm
+  );
 
   if (allDone && stats) {
     return (
@@ -321,12 +320,10 @@ function ActiveExercise({ exercise, onClose, onComplete }) {
           title="¿Salir del ejercicio?"
           subtitle="Se perderá el progreso actual"
           confirmOption={exitConfirmOption}
-          setConfirmOption={setExitConfirmOption}
           onConfirm={onClose}
-          onCancel={() => setShowExitConfirm(false)}
+          onCancel={() => { setShowExitConfirm(false); setExitConfirmOption(0); }}
         />
       )}
-
       <div className="shrink-0 flex items-center justify-between px-4 sm:px-6 py-3 border-b border-border bg-card/80 backdrop-blur-sm">
         <div className="flex items-center gap-3">
           <button onClick={() => { setShowExitConfirm(true); setExitConfirmOption(0); }} className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center hover:bg-muted transition-colors">
@@ -343,7 +340,6 @@ function ActiveExercise({ exercise, onClose, onComplete }) {
           ))}
         </div>
       </div>
-
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-[1400px] mx-auto px-3 sm:px-6 py-4 space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -374,122 +370,82 @@ function ActiveExercise({ exercise, onClose, onComplete }) {
               )}
             </div>
           </div>
-
-          <TopLetters
-            letters={topLettersData}
-            onPick={ejecutarTecla}
-            zona={emgZona === "top" ? "top" : "keyboard"}
-            topIndex={emgTopIndex}
-            onOpenDictionary={openDictionary}
-          />
-
+          <TopLetters letters={topLettersData} onPick={ejecutarTecla} zona={zona} topIndex={topIndex} onOpenDictionary={openDictionary} />
           <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-4">
             <div className="space-y-2">
               <Keyboard
-                onType={ejecutarTecla}
-                onBackspace={handleBackspace}
-                onClear={handleClear}
-                onSpace={handleSpace}
-                onOpenDictionary={openDictionary}
-                onOpenSharing={() => {}}
-                hideNavRow={true}
-                zona={emgZona === "keyboard" ? "keyboard" : "top"}
-                kbRow={kbRow}
-                kbCol={kbCol}
-                filaBlockeada={filaBlockeada}
-                emgZona={emgZona}
-                externalShift={shift}
-                externalNumMode={numMode}
-                onShiftChange={setShift}
-                onNumModeChange={setNumMode}
+                onType={ejecutarTecla} onBackspace={handleBackspace} onClear={handleClear}
+                onSpace={handleSpace} onOpenDictionary={openDictionary} onOpenSharing={() => {}}
+                hideNavRow={true} zona={zona} kbRow={kbRow} kbCol={kbCol}
+                filaBlockeada={filaBlockeada} emgZona={emgZona}
+                externalShift={shift} externalNumMode={numMode}
+                onShiftChange={setShift} onNumModeChange={setNumMode}
               />
               <button
                 onClick={() => { setShowExitConfirm(true); setExitConfirmOption(0); }}
                 style={
-                  emgZona === "keyboard" && kbRow === activeRows.length - 1
+                  zona === "keyboard" && kbRow === activeRows.length - 1
                     ? filaBlockeada
                       ? { backgroundColor: "#ef4444", borderColor: "#b91c1c", color: "#ffffff", boxShadow: "0 0 0 2px #b91c1c" }
                       : { backgroundColor: "#fecaca", borderColor: "#f87171", color: "#991b1b" }
                     : { backgroundColor: "#fee2e2", borderColor: "#fca5a5", color: "#991b1b" }
                 }
                 className="w-full h-14 rounded-2xl border-2 font-semibold text-base flex items-center justify-center gap-2 transition-all"
-              >
-                ✕ Salir del ejercicio
-              </button>
+              >✕ Salir del ejercicio</button>
             </div>
             <div className="hidden xl:block">
-              <SuggestionsSidebar
-                suggestions={suggestionsData}
-                onPick={handlePickWord}
-                highlighted={emgZona === "dictionary"}
-                zona={emgZona === "dictionary" ? "suggestions" : undefined}
-                suggestionIndex={emgDictIndex}
-              />
+              <SuggestionsSidebar suggestions={suggestionsData} onPick={handlePickWord} highlighted={emgZona === "dictionary"} zona={zona} suggestionIndex={suggestionIndex} />
             </div>
           </div>
           <div className="xl:hidden">
-            <SuggestionsSidebar
-              suggestions={suggestionsData}
-              onPick={handlePickWord}
-              highlighted={emgZona === "dictionary"}
-              zona={emgZona === "dictionary" ? "suggestions" : undefined}
-              suggestionIndex={emgDictIndex}
-            />
+            <SuggestionsSidebar suggestions={suggestionsData} onPick={handlePickWord} highlighted={emgZona === "dictionary"} zona={zona} suggestionIndex={suggestionIndex} />
           </div>
         </div>
       </div>
-      <MobileDictionary open={mobileDictOpen} onClose={() => setMobileDictOpen(false)} suggestions={exercise.suggestions} onPick={handlePickWord} />
+      <MobileDictionary open={mobileDictOpen} onClose={() => setMobileDictOpen(false)} suggestions={suggestionsData.map(s => s.word)} onPick={handlePickWord} />
     </div>
   );
 }
 
 /* ─── EXERCISE LIST ─── */
 function ExerciseList({ exercises, completedIds, onStart, enabled = true }) {
-  const { claimEMG, releaseEMG } = useEMG();
-  const [selectedIdx, setSelectedIdx] = useState(null);
+  const [selectedIdx, setSelectedIdx] = useState(0); // empieza en 0 no null
   const [confirmMode, setConfirmMode] = useState(false);
   const [confirmOption, setConfirmOption] = useState(0);
 
-  // Guardamos TODO lo necesario en el ref para evitar closures stale
-  const stateRef = useRef({});
-  stateRef.current = { selectedIdx, confirmMode, confirmOption, onStart, exercises };
+  const selectedIdxRef = useRef(0);
+  const confirmOptionRef = useRef(0);
+  selectedIdxRef.current = selectedIdx;
+  confirmOptionRef.current = confirmOption;
 
-  useEffect(() => {
-    console.log("[EMG] ExerciseList montó, enabled:", enabled);
-    if (!enabled) {
-      console.log("[EMG] ExerciseList releasing porque enabled=false");
-      releaseEMG("exerciselist");
-      return;
-    }
-
-    const t = setTimeout(() => {
-      console.log("[EMG] ExerciseList haciendo claimEMG");
-      claimEMG(
-        "exerciselist",
-        () => {
-          console.log("[EMG] DER recibido en ExerciseList");
-          const s = stateRef.current;
-          if (s.confirmMode) { setConfirmOption((o) => (o === 0 ? 1 : 0)); return; }
-          setSelectedIdx((i) => {
-            if (i === null) return 0;
-            return i + 1 >= s.exercises.length ? 0 : i + 1;
-          });
-        },
-        () => {
-          console.log("[EMG] IZQ recibido en ExerciseList");
-          const s = stateRef.current;
-          if (s.confirmMode) {
-            if (s.confirmOption === 0) { setConfirmMode(false); s.onStart(s.exercises[s.selectedIdx]); }
-            else { setConfirmMode(false); setConfirmOption(0); }
-            return;
-          }
-          if (s.selectedIdx !== null) { setConfirmMode(true); setConfirmOption(0); }
+  // Derecha → siguiente ejercicio (cicla), Izquierda → abre confirm
+  useEMGSimple(
+    "ws://192.168.4.1:8081",
+    // Derecha — navega o alterna confirm
+    () => {
+      if (confirmMode) {
+        setConfirmOption((o) => o === 0 ? 1 : 0);
+      } else {
+        setSelectedIdx((i) => (i + 1 >= exercises.length ? 0 : i + 1));
+      }
+    },
+    // Izquierda — abre confirm o ejecuta
+    () => {
+      if (confirmMode) {
+        if (confirmOptionRef.current === 0) {
+          setConfirmMode(false);
+          onStart(exercises[selectedIdxRef.current]);
+        } else {
+          setConfirmMode(false);
+          setConfirmOption(0);
         }
-      );
-    }, 50);
-
-    return () => { clearTimeout(t); releaseEMG("exerciselist"); };
-  }, [enabled]);
+      } else {
+        setConfirmMode(true);
+        setConfirmOption(0);
+      }
+    },
+    enabled
+  );
 
   const levelStyle = (level) => ({
     Básico: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20",
@@ -499,13 +455,12 @@ function ExerciseList({ exercises, completedIds, onStart, enabled = true }) {
 
   return (
     <div className="relative">
-      {confirmMode && selectedIdx !== null && (
+      {confirmMode && (
         <ConfirmDialog
           title={`${exercises[selectedIdx].emoji} ${exercises[selectedIdx].title}`}
           subtitle={`${exercises[selectedIdx].level} · ${exercises[selectedIdx].duration} — ¿Iniciar este ejercicio?`}
           confirmOption={confirmOption}
-          setConfirmOption={setConfirmOption}
-          onConfirm={() => { setConfirmMode(false); stateRef.current.onStart(exercises[selectedIdx]); }}
+          onConfirm={() => { setConfirmMode(false); onStart(exercises[selectedIdx]); }}
           onCancel={() => { setConfirmMode(false); setConfirmOption(0); }}
         />
       )}
@@ -513,7 +468,7 @@ function ExerciseList({ exercises, completedIds, onStart, enabled = true }) {
         {exercises.map((ex, idx) => (
           <div
             key={ex.id}
-            style={selectedIdx === idx ? { borderColor: "#38bdf8", boxShadow: "0 0 0 2px #38bdf8" } : {}}
+            style={!confirmMode && selectedIdx === idx ? { borderColor: "#38bdf8", boxShadow: "0 0 0 2px #38bdf8" } : {}}
             className="group rounded-3xl border border-border/70 bg-card p-6 soft-shadow hover:border-accent/50 transition-all flex flex-col"
           >
             <div className="flex items-start justify-between mb-4">
@@ -542,6 +497,7 @@ function ExerciseList({ exercises, completedIds, onStart, enabled = true }) {
 export default function Practice() {
   const [active, setActive] = useState(null);
   const [completedIds, setCompletedIds] = useState(new Set());
+
   const handleStart = (ex) => setActive(ex);
   const handleComplete = (id) => setCompletedIds((s) => new Set([...s, id]));
   const handleClose = () => setActive(null);
@@ -551,7 +507,7 @@ export default function Practice() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
+      {/* <Header /> comentado temporalmente */}
       {active && <ActiveExercise exercise={active} onClose={handleClose} onComplete={handleComplete} />}
       <main className="max-w-[1400px] mx-auto px-4 sm:px-8 py-8 lg:py-12">
         <div className="relative rounded-3xl bg-gradient-to-br from-primary to-[hsl(196_85%_22%)] text-primary-foreground p-7 sm:p-10 mb-8 overflow-hidden soft-shadow">
