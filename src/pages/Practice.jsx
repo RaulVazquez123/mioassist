@@ -5,6 +5,7 @@ import TopLetters from "@/components/writer/TopLetters";
 import SuggestionsSidebar from "@/components/writer/SuggestionsSidebar";
 import MobileDictionary from "@/components/writer/MobileDictionary";
 import { getTopLetters, getSuggestedWords, isLanguageModelReady, loadLanguageModel } from "@/lib/languageModel";
+import { useEMG } from "@/lib/EMGContext";
 import {
   Dumbbell, Sparkles, Trophy, Star, CheckCircle2,
   RotateCcw, Zap, ArrowLeft, Target, Clock, MousePointerClick, Percent
@@ -93,17 +94,22 @@ function ConfirmDialog({ title, subtitle, onConfirm, onCancel, confirmOption, se
 }
 
 /* ─── STATS SCREEN ─── */
-function StatsScreen({ stats, exercise, wsUrl, onRepeat, onAnother, onClose }) {
+function StatsScreen({ stats, exercise, onRepeat, onAnother, onClose }) {
+  const { claimEMG, releaseEMG } = useEMG();
   const mins = Math.floor(stats.seconds / 60);
   const secs = stats.seconds % 60;
-  const [selectedBtn, setSelectedBtn] = useState(0); // 0=Repetir, 1=Otro, 2=Volver
-
+  const [selectedBtn, setSelectedBtn] = useState(0);
   const actions = [onRepeat, onAnother, onClose];
+  const actionsRef = useRef({});
+  actionsRef.current = { selectedBtn, actions };
 
-  useEMGSimple(wsUrl,
-    () => setSelectedBtn((i) => (i + 1) % 3),
-    () => actions[selectedBtn]()
-  );
+  useEffect(() => {
+    claimEMG("statsscreen",
+      () => setSelectedBtn((i) => (i + 1) % 3),
+      () => actionsRef.current.actions[actionsRef.current.selectedBtn]()
+    );
+    return () => releaseEMG("statsscreen");
+  }, []);
 
   const btnStyle = (idx) => selectedBtn === idx
     ? { backgroundColor: "#7dd3fc", borderColor: "#38bdf8", boxShadow: "0 0 0 2px #38bdf8", color: "#0f172a" }
@@ -179,7 +185,7 @@ function StatsScreen({ stats, exercise, wsUrl, onRepeat, onAnother, onClose }) {
 }
 
 /* ─── ACTIVE EXERCISE ─── */
-function ActiveExercise({ exercise, wsUrl, onClose, onComplete }) {
+function ActiveExercise({ exercise, onClose, onComplete }) {
   const [step, setStep] = useState(0);
   const [typed, setTyped] = useState("");
   const [allDone, setAllDone] = useState(false);
@@ -276,77 +282,80 @@ function ActiveExercise({ exercise, wsUrl, onClose, onComplete }) {
   const stateRef = useRef({});
   stateRef.current = { filaBlockeada, emgZona, kbRow, kbCol, emgTopIndex, showExitConfirm, exitConfirmOption, topLettersData, suggestionsData, emgDictIndex };
 
-  useEMGSimple(wsUrl,
-    // DERECHA
-    () => {
-      const s = stateRef.current;
-      if (s.showExitConfirm) { setExitConfirmOption((o) => o === 0 ? 1 : 0); return; }
-      if (s.emgZona === "dictionary") {
-        setEmgDictIndex((i) => (i + 1 >= s.suggestionsData.length ? 0 : i + 1));
-        return;
-      }
-      if (s.emgZona === "top") {
-        if (!s.filaBlockeada) { setEmgZona("keyboard"); setKbRow(0); setKbCol(0); }
-        else { setEmgTopIndex((i) => (i + 1 >= 6 ? 0 : i + 1)); }
-      } else if (s.emgZona === "keyboard") {
-        if (!s.filaBlockeada) {
-          const maxRow = activeRows.length - 1;
-          if (s.kbRow >= maxRow) { setEmgZona("top"); setKbRow(0); setKbCol(0); }
-          else { setKbRow((r) => r + 1); setKbCol(0); }
-        } else {
-          const rowLen = activeRows[s.kbRow]?.length ?? 1;
-          setKbCol((c) => (c + 1 >= rowLen ? 0 : c + 1));
+  const { claimEMG, releaseEMG } = useEMG();
+
+  useEffect(() => {
+    claimEMG("activeexercise",
+      () => {
+        const s = stateRef.current;
+        if (s.showExitConfirm) { setExitConfirmOption((o) => o === 0 ? 1 : 0); return; }
+        if (s.emgZona === "dictionary") {
+          setEmgDictIndex((i) => (i + 1 >= s.suggestionsData.length ? 0 : i + 1));
+          return;
         }
-      }
-    },
-    // IZQUIERDA
-    () => {
-      const s = stateRef.current;
-      if (s.showExitConfirm) {
-        if (s.exitConfirmOption === 0) { onClose(); }
-        else { setShowExitConfirm(false); }
-        return;
-      }
-      if (s.emgZona === "dictionary") {
-        const palabra = s.suggestionsData[s.emgDictIndex]?.word;
-        if (palabra) handlePickWord(palabra);
-        setEmgZona("top");
-        setEmgDictIndex(0);
-        return;
-      }
-      if (s.emgZona === "top") {
-        if (!s.filaBlockeada) { setFilaBloqueada(true); setEmgTopIndex(0); }
-        else {
-          const letra = s.topLettersData[s.emgTopIndex]?.letter;
-          if (letra) ejecutarTecla(letra);
-          setFilaBloqueada(false);
-          setEmgTopIndex(0);
+        if (s.emgZona === "top") {
+          if (!s.filaBlockeada) { setEmgZona("keyboard"); setKbRow(0); setKbCol(0); }
+          else { setEmgTopIndex((i) => (i + 1 >= 6 ? 0 : i + 1)); }
+        } else if (s.emgZona === "keyboard") {
+          if (!s.filaBlockeada) {
+            const maxRow = activeRows.length - 1;
+            if (s.kbRow >= maxRow) { setEmgZona("top"); setKbRow(0); setKbCol(0); }
+            else { setKbRow((r) => r + 1); setKbCol(0); }
+          } else {
+            const rowLen = activeRows[s.kbRow]?.length ?? 1;
+            setKbCol((c) => (c + 1 >= rowLen ? 0 : c + 1));
+          }
         }
-      } else if (s.emgZona === "keyboard") {
-        if (!s.filaBlockeada) { setFilaBloqueada(true); setKbCol(0); }
-        else {
-          const row = activeRows[s.kbRow];
-          if (row) {
-            const key = row[Math.min(s.kbCol, row.length - 1)];
-            if (key) ejecutarTecla(key);
-            if (!["SALIR","SHIFT","123","ESPACIO","BORRAR","LIMPIAR","DICCIONARIO"].includes(key)) {
-              setFilaBloqueada(false);
-              setEmgZona("top");
-              setKbRow(0); setKbCol(0);
-              setEmgTopIndex(0);
-            } else {
-              setFilaBloqueada(false);
+      },
+      () => {
+        const s = stateRef.current;
+        if (s.showExitConfirm) {
+          if (s.exitConfirmOption === 0) { onClose(); }
+          else { setShowExitConfirm(false); }
+          return;
+        }
+        if (s.emgZona === "dictionary") {
+          const palabra = s.suggestionsData[s.emgDictIndex]?.word;
+          if (palabra) handlePickWord(palabra);
+          setEmgZona("top");
+          setEmgDictIndex(0);
+          return;
+        }
+        if (s.emgZona === "top") {
+          if (!s.filaBlockeada) { setFilaBloqueada(true); setEmgTopIndex(0); }
+          else {
+            const letra = s.topLettersData[s.emgTopIndex]?.letter;
+            if (letra) ejecutarTecla(letra);
+            setFilaBloqueada(false);
+            setEmgTopIndex(0);
+          }
+        } else if (s.emgZona === "keyboard") {
+          if (!s.filaBlockeada) { setFilaBloqueada(true); setKbCol(0); }
+          else {
+            const row = activeRows[s.kbRow];
+            if (row) {
+              const key = row[Math.min(s.kbCol, row.length - 1)];
+              if (key) ejecutarTecla(key);
+              if (!["SALIR","SHIFT","123","ESPACIO","BORRAR","LIMPIAR","DICCIONARIO"].includes(key)) {
+                setFilaBloqueada(false);
+                setEmgZona("top");
+                setKbRow(0); setKbCol(0);
+                setEmgTopIndex(0);
+              } else {
+                setFilaBloqueada(false);
+              }
             }
           }
         }
       }
-    }
-  );
+    );
+    return () => releaseEMG("activeexercise");
+  }, []);
 
   if (allDone && stats) {
     return (
       <StatsScreen
-        stats={stats} exercise={exercise} wsUrl={wsUrl}
+        stats={stats} exercise={exercise}
         onRepeat={() => { setStep(0); setTyped(""); setAllDone(false); startTime.current = Date.now(); clicks.current = 0; totalChars.current = 0; correctChars.current = 0; }}
         onAnother={onClose}
         onClose={onClose}
@@ -485,30 +494,36 @@ function ActiveExercise({ exercise, wsUrl, onClose, onComplete }) {
 }
 
 /* ─── EXERCISE LIST ─── */
-function ExerciseList({ exercises, completedIds, onStart, wsUrl, enabled = true }) {
+function ExerciseList({ exercises, completedIds, onStart, enabled = true }) {
+  const { claimEMG, releaseEMG } = useEMG();
   const [selectedIdx, setSelectedIdx] = useState(null);
   const [confirmMode, setConfirmMode] = useState(false);
   const [confirmOption, setConfirmOption] = useState(0);
   const stateRef = useRef({});
   stateRef.current = { selectedIdx, confirmMode, confirmOption };
 
-  useEMGSimple(wsUrl,
-    () => {
-      const s = stateRef.current;
-      if (s.confirmMode) { setConfirmOption((o) => o === 0 ? 1 : 0); return; }
-      setSelectedIdx((i) => { if (i === null) return 0; return Math.min(i + 1, exercises.length - 1); });
-    },
-    () => {
-      const s = stateRef.current;
-      if (s.confirmMode) {
-        if (s.confirmOption === 0) { setConfirmMode(false); onStart(exercises[s.selectedIdx]); }
-        else { setConfirmMode(false); setConfirmOption(0); }
-        return;
+  useEffect(() => {
+    if (!enabled) { releaseEMG("exerciselist"); return; }
+
+    claimEMG("exerciselist",
+      () => {
+        const s = stateRef.current;
+        if (s.confirmMode) { setConfirmOption((o) => o === 0 ? 1 : 0); return; }
+        setSelectedIdx((i) => { if (i === null) return 0; return (i + 1) >= exercises.length ? 0 : i + 1; });
+      },
+      () => {
+        const s = stateRef.current;
+        if (s.confirmMode) {
+          if (s.confirmOption === 0) { setConfirmMode(false); onStart(exercises[s.selectedIdx]); }
+          else { setConfirmMode(false); setConfirmOption(0); }
+          return;
+        }
+        if (s.selectedIdx !== null) { setConfirmMode(true); setConfirmOption(0); }
       }
-      if (s.selectedIdx !== null) { setConfirmMode(true); setConfirmOption(0); }
-    },
-    enabled
-  );
+    );
+
+    return () => releaseEMG("exerciselist");
+  }, [enabled]);
 
   const levelStyle = (level) => ({ Básico: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20", Intermedio: "bg-amber-500/10 text-amber-700 border-amber-500/20", Avanzado: "bg-primary/10 text-primary border-primary/20" }[level]);
 
@@ -553,8 +568,6 @@ function ExerciseList({ exercises, completedIds, onStart, wsUrl, enabled = true 
 export default function Practice() {
   const [active, setActive] = useState(null);
   const [completedIds, setCompletedIds] = useState(new Set());
-  const wsUrl = "ws://localhost:8081";
-
   const handleStart = (ex) => setActive(ex);
   const handleComplete = (id) => setCompletedIds((s) => new Set([...s, id]));
   const handleClose = () => setActive(null);
@@ -565,7 +578,7 @@ export default function Practice() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      {active && <ActiveExercise exercise={active} wsUrl={wsUrl} onClose={handleClose} onComplete={handleComplete} />}
+      {active && <ActiveExercise exercise={active} onClose={handleClose} onComplete={handleComplete} />}
       <main className="max-w-[1400px] mx-auto px-4 sm:px-8 py-8 lg:py-12">
         <div className="relative rounded-3xl bg-gradient-to-br from-primary to-[hsl(196_85%_22%)] text-primary-foreground p-7 sm:p-10 mb-8 overflow-hidden soft-shadow">
           <div className="absolute -right-16 -bottom-16 w-72 h-72 rounded-full bg-accent/25 blur-3xl pointer-events-none" />
@@ -590,7 +603,7 @@ export default function Practice() {
             </div>
           </div>
         </div>
-        <ExerciseList exercises={EXERCISES} completedIds={completedIds} onStart={handleStart} wsUrl={wsUrl} enabled={!active} />
+        <ExerciseList exercises={EXERCISES} completedIds={completedIds} onStart={handleStart} enabled={!active} />
       </main>
     </div>
   );
