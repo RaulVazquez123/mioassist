@@ -15,7 +15,6 @@ import {
   Dumbbell, Sparkles, Trophy, Star, CheckCircle2,
   RotateCcw, Zap, ArrowLeft, Target, Clock, MousePointerClick, Percent
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const EXERCISES = [
@@ -43,7 +42,8 @@ const NUM_ROWS = [
   ["SALIR"],
 ];
 
-// Hook EMG simple — propio WebSocket, sin depender del contexto
+const WS_URL = "ws://192.168.4.1:8081";
+
 function useEMGSimple(wsUrl, onDer, onIzq, enabled = true) {
   const ws = useRef(null);
   const cbRef = useRef({ onDer, onIzq });
@@ -74,8 +74,8 @@ function useEMGSimple(wsUrl, onDer, onIzq, enabled = true) {
   }, [wsUrl, enabled]);
 }
 
-/* ─── CONFIRM DIALOG ─── */
-function ConfirmDialog({ title, subtitle, onConfirm, onCancel, confirmOption }) {
+/* ─── CONFIRM DIALOG (2 opciones) ─── */
+function ConfirmDialog({ title, subtitle, onConfirm, onCancel, confirmOption, confirmLabel = "✅ Confirmar", cancelLabel = "❌ Cancelar" }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
       <div className="bg-card rounded-3xl border border-border p-8 max-w-sm w-full soft-shadow text-center space-y-5">
@@ -86,12 +86,12 @@ function ConfirmDialog({ title, subtitle, onConfirm, onCancel, confirmOption }) 
             onClick={onConfirm}
             style={confirmOption === 0 ? { backgroundColor: "#7dd3fc", borderColor: "#38bdf8", boxShadow: "0 0 0 2px #38bdf8", color: "#0f172a" } : {}}
             className="flex-1 h-12 rounded-2xl border-2 border-border font-semibold text-sm transition-all"
-          >✅ Confirmar</button>
+          >{confirmLabel}</button>
           <button
             onClick={onCancel}
             style={confirmOption === 1 ? { backgroundColor: "#fca5a5", borderColor: "#f87171", boxShadow: "0 0 0 2px #f87171", color: "#0f172a" } : {}}
             className="flex-1 h-12 rounded-2xl border-2 border-border font-semibold text-sm transition-all"
-          >❌ Cancelar</button>
+          >{cancelLabel}</button>
         </div>
       </div>
     </div>
@@ -106,7 +106,7 @@ function StatsScreen({ stats, exercise, onRepeat, onAnother, onClose }) {
   const cbRef = useRef({ onRepeat, onAnother, onClose, selectedBtn });
   cbRef.current = { onRepeat, onAnother, onClose, selectedBtn };
 
-  useEMGSimple("ws://192.168.4.1:8081",
+  useEMGSimple(WS_URL,
     () => setSelectedBtn((i) => (i + 1) % 3),
     () => {
       const { selectedBtn, onRepeat, onAnother, onClose } = cbRef.current;
@@ -179,6 +179,8 @@ function ActiveExercise({ exercise, onClose, onComplete }) {
   const [modelReady, setModelReady] = useState(isLanguageModelReady());
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [exitConfirmOption, setExitConfirmOption] = useState(0);
+  const [showNextConfirm, setShowNextConfirm] = useState(false);
+  const [nextConfirmOption, setNextConfirmOption] = useState(0);
 
   const [filaBlockeada, setFilaBloqueada] = useState(false);
   const [emgZona, setEmgZona] = useState("top");
@@ -199,6 +201,8 @@ function ActiveExercise({ exercise, onClose, onComplete }) {
 
   const exitConfirmOptionRef = useRef(0);
   exitConfirmOptionRef.current = exitConfirmOption;
+  const nextConfirmOptionRef = useRef(0);
+  nextConfirmOptionRef.current = nextConfirmOption;
 
   useEffect(() => {
     if (!isLanguageModelReady()) loadLanguageModel().then(() => setModelReady(true));
@@ -208,6 +212,14 @@ function ActiveExercise({ exercise, onClose, onComplete }) {
   const isMatch = typed.trim().toLowerCase() === target.toLowerCase();
   const totalSteps = exercise.phrases.length;
   const activeRows = numMode ? NUM_ROWS : LETTER_ROWS;
+
+  // Cuando se completa la frase, mostrar confirm automáticamente
+  useEffect(() => {
+    if (isMatch && !showNextConfirm && !showExitConfirm) {
+      setShowNextConfirm(true);
+      setNextConfirmOption(0);
+    }
+  }, [isMatch]);
 
   const topLettersData = useMemo(() => {
     if (!modelReady) {
@@ -221,8 +233,7 @@ function ActiveExercise({ exercise, onClose, onComplete }) {
   const suggestionsData = useMemo(() => {
     if (!typed.trim()) return [];
     if (!modelReady) return exercise.suggestions.map((w) => ({ word: w }));
-    const modelWords = getSuggestedWords(typed, 8);
-    return modelWords;
+    return getSuggestedWords(typed, 8);
   }, [typed, exercise.suggestions, modelReady]);
 
   const handleType = (ch) => {
@@ -252,6 +263,7 @@ function ActiveExercise({ exercise, onClose, onComplete }) {
   };
 
   const handleNextStep = () => {
+    setShowNextConfirm(false);
     if (step >= totalSteps - 1) {
       const seconds = Math.floor((Date.now() - startTime.current) / 1000);
       const precision = totalChars.current > 0 ? Math.round((correctChars.current / totalChars.current) * 100) : 100;
@@ -261,7 +273,14 @@ function ActiveExercise({ exercise, onClose, onComplete }) {
     } else {
       setStep((s) => s + 1);
       setTyped("");
+      setShift(true);
     }
+  };
+
+  const handleRetry = () => {
+    setShowNextConfirm(false);
+    setTyped("");
+    setShift(true);
   };
 
   useEffect(() => { setTopIndex(emgTopIndex); }, [emgTopIndex]);
@@ -272,7 +291,8 @@ function ActiveExercise({ exercise, onClose, onComplete }) {
   }, [emgZona]);
   useEffect(() => { setSuggestionIndex(emgDictIndex); }, [emgDictIndex]);
 
-  // Hook principal del teclado — desactivado cuando el confirm de salir está abierto
+  const anyConfirmOpen = showExitConfirm || showNextConfirm;
+
   useEMGKeyboard({
     activeRows,
     kbRow, setKbRow,
@@ -288,12 +308,12 @@ function ActiveExercise({ exercise, onClose, onComplete }) {
     onSelectWord: handlePickWord,
     onOpenDictionary: openDictionary,
     onExecuteAction: () => {},
-    wsUrl: showExitConfirm ? null : "ws://192.168.4.1:8081",
+    wsUrl: anyConfirmOpen ? null : WS_URL,
   });
 
-  // Hook para el confirm de salir
+  // Hook para confirm de salir
   useEMGSimple(
-    "ws://192.168.4.1:8081",
+    WS_URL,
     () => setExitConfirmOption((o) => o === 0 ? 1 : 0),
     () => {
       if (exitConfirmOptionRef.current === 0) { onClose(); }
@@ -302,16 +322,29 @@ function ActiveExercise({ exercise, onClose, onComplete }) {
     showExitConfirm
   );
 
+  // Hook para confirm de siguiente/reintentar
+  useEMGSimple(
+    WS_URL,
+    () => setNextConfirmOption((o) => o === 0 ? 1 : 0),
+    () => {
+      if (nextConfirmOptionRef.current === 0) handleNextStep();
+      else handleRetry();
+    },
+    showNextConfirm
+  );
+
   if (allDone && stats) {
     return (
       <StatsScreen
         stats={stats} exercise={exercise}
-        onRepeat={() => { setStep(0); setTyped(""); setAllDone(false); startTime.current = Date.now(); clicks.current = 0; totalChars.current = 0; correctChars.current = 0; }}
+        onRepeat={() => { setStep(0); setTyped(""); setAllDone(false); setShift(true); startTime.current = Date.now(); clicks.current = 0; totalChars.current = 0; correctChars.current = 0; }}
         onAnother={onClose}
         onClose={onClose}
       />
     );
   }
+
+  const isLastStep = step >= totalSteps - 1;
 
   return (
     <div className="fixed inset-0 z-50 bg-background flex flex-col overflow-hidden">
@@ -322,6 +355,17 @@ function ActiveExercise({ exercise, onClose, onComplete }) {
           confirmOption={exitConfirmOption}
           onConfirm={onClose}
           onCancel={() => { setShowExitConfirm(false); setExitConfirmOption(0); }}
+        />
+      )}
+      {showNextConfirm && (
+        <ConfirmDialog
+          title="✓ ¡Correcto!"
+          subtitle={isLastStep ? "¿Finalizar el ejercicio?" : `Frase ${step + 1} de ${totalSteps} completada`}
+          confirmOption={nextConfirmOption}
+          confirmLabel={isLastStep ? "🏆 Finalizar" : "➡️ Siguiente"}
+          cancelLabel="🔄 Reintentar"
+          onConfirm={handleNextStep}
+          onCancel={handleRetry}
         />
       )}
       <div className="shrink-0 flex items-center justify-between px-4 sm:px-6 py-3 border-b border-border bg-card/80 backdrop-blur-sm">
@@ -363,11 +407,6 @@ function ActiveExercise({ exercise, onClose, onComplete }) {
               <div className={cn("text-2xl sm:text-3xl font-mono tracking-wide min-h-[2.5rem] flex items-center", isMatch ? "text-emerald-600 font-semibold" : "text-foreground")}>
                 {typed || <span className="text-muted-foreground/30 font-light">usa el teclado</span>}
               </div>
-              {isMatch && (
-                <Button onClick={handleNextStep} className="mt-4 w-full h-11 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-semibold gap-2">
-                  {step >= totalSteps - 1 ? "Finalizar ejercicio 🏆" : "Siguiente frase →"}
-                </Button>
-              )}
             </div>
           </div>
           <TopLetters letters={topLettersData} onPick={ejecutarTecla} zona={zona} topIndex={topIndex} onOpenDictionary={openDictionary} />
@@ -409,7 +448,7 @@ function ActiveExercise({ exercise, onClose, onComplete }) {
 
 /* ─── EXERCISE LIST ─── */
 function ExerciseList({ exercises, completedIds, onStart, enabled = true }) {
-  const [selectedIdx, setSelectedIdx] = useState(0); // empieza en 0 no null
+  const [selectedIdx, setSelectedIdx] = useState(0);
   const [confirmMode, setConfirmMode] = useState(false);
   const [confirmOption, setConfirmOption] = useState(0);
 
@@ -418,27 +457,16 @@ function ExerciseList({ exercises, completedIds, onStart, enabled = true }) {
   selectedIdxRef.current = selectedIdx;
   confirmOptionRef.current = confirmOption;
 
-  // Derecha → siguiente ejercicio (cicla), Izquierda → abre confirm
   useEMGSimple(
-    "ws://192.168.4.1:8081",
-    // Derecha — navega o alterna confirm
+    WS_URL,
     () => {
-      if (confirmMode) {
-        setConfirmOption((o) => o === 0 ? 1 : 0);
-      } else {
-        setSelectedIdx((i) => (i + 1 >= exercises.length ? 0 : i + 1));
-      }
+      if (confirmMode) { setConfirmOption((o) => o === 0 ? 1 : 0); }
+      else { setSelectedIdx((i) => (i + 1 >= exercises.length ? 0 : i + 1)); }
     },
-    // Izquierda — abre confirm o ejecuta
     () => {
       if (confirmMode) {
-        if (confirmOptionRef.current === 0) {
-          setConfirmMode(false);
-          onStart(exercises[selectedIdxRef.current]);
-        } else {
-          setConfirmMode(false);
-          setConfirmOption(0);
-        }
+        if (confirmOptionRef.current === 0) { setConfirmMode(false); onStart(exercises[selectedIdxRef.current]); }
+        else { setConfirmMode(false); setConfirmOption(0); }
       } else {
         setConfirmMode(true);
         setConfirmOption(0);
@@ -483,9 +511,9 @@ function ExerciseList({ exercises, completedIds, onStart, enabled = true }) {
             <div className="flex items-center gap-2 mb-5 flex-wrap">
               {ex.tags.map((t) => <span key={t} className="text-[11px] bg-secondary rounded-full px-2.5 py-1 text-muted-foreground">{t}</span>)}
             </div>
-            <Button onClick={() => onStart(ex)} className="w-full h-12 rounded-2xl bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground font-semibold">
-              <Zap className="w-4 h-4 mr-2" />Iniciar · {ex.duration}
-            </Button>
+            <button onClick={() => onStart(ex)} className="w-full h-12 rounded-2xl bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground font-semibold flex items-center justify-center gap-2">
+              <Zap className="w-4 h-4" />Iniciar · {ex.duration}
+            </button>
           </div>
         ))}
       </div>
