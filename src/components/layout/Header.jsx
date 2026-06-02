@@ -24,7 +24,6 @@ export default function Header({ zona, headerIndex = 0 }) {
   const { user, logout } = useAuth();
   const isWriter = pathname === "/";
 
-  // EMG state — solo activo fuera de Writer
   const [emgIndex, setEmgIndex] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmOption, setConfirmOption] = useState(0);
@@ -34,7 +33,10 @@ export default function Header({ zona, headerIndex = 0 }) {
   stateRef.current = { emgIndex, confirmOpen, confirmOption };
 
   useEffect(() => {
-    if (isWriter) { releaseEMG("header"); return; }
+    if (isWriter) {
+      releaseEMG("header");
+      return;
+    }
 
     claimEMG("header",
       () => {
@@ -58,17 +60,17 @@ export default function Header({ zona, headerIndex = 0 }) {
         if (emgIndex !== null) { setConfirmOpen(true); setConfirmOption(0); }
       }
     );
+
+    return () => releaseEMG("header");  // ← FIX: libera el claim al salir de la página
   }, [isWriter, pathname]);
 
   const handleLogout = () => logout();
 
-  // El índice activo es el de Writer (prop) o el de EMG (fuera de Writer)
   const activeEmgIndex = isWriter ? headerIndex : emgIndex;
   const activeZona = isWriter ? zona : (emgIndex !== null ? "header" : null);
 
   return (
     <>
-      {/* Confirm dialog */}
       {confirmOpen && emgIndex !== null && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
           <div className="bg-card rounded-3xl border border-border p-8 max-w-sm w-full soft-shadow text-center space-y-5">
