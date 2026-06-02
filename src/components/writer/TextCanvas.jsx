@@ -6,7 +6,6 @@ export default function TextCanvas({ value, onChange }) {
   const wordCount = value.trim() ? value.trim().split(/\s+/).length : 0;
   const textareaRef = useRef(null);
 
-  // Mantener foco siempre — necesario para EMG
   useEffect(() => {
     const mantenerFoco = () => {
       if (textareaRef.current && document.activeElement !== textareaRef.current) {
@@ -18,7 +17,6 @@ export default function TextCanvas({ value, onChange }) {
     return () => clearInterval(interval);
   }, []);
 
-  // Mover cursor al final cuando cambia el valor
   useEffect(() => {
     if (textareaRef.current) {
       const len = value.length;
@@ -46,7 +44,8 @@ export default function TextCanvas({ value, onChange }) {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Empieza a escribir con señales EMG…"
-        className="min-h-[180px] sm:min-h-[220px] text-4xl sm:text-5xl leading-relaxed font-light border-0 focus-visible:ring-0 focus-visible:ring-offset-0 resize-none px-6 sm:px-8 pb-8 bg-transparent placeholder:text-muted-foreground/50"
+        style={{ fontSize: "3rem", lineHeight: "1.4", caretColor: "transparent" }}
+        className="min-h-[160px] sm:min-h-[200px] font-light border-0 focus-visible:ring-0 focus-visible:ring-offset-0 resize-none px-6 sm:px-8 pb-8 bg-transparent placeholder:text-muted-foreground/50"
         autoFocus
       />
     </div>
