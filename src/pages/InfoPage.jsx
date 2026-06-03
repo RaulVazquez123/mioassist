@@ -1,19 +1,59 @@
-import React, { useState } from "react";
-import Header from "@/components/layout/Header";
-import { useEMGPage } from "@/hooks/useEMGPage";
+import React, { useState, useRef, useEffect } from "react";
+import NavBar, { navItems } from "@/components/layout/NavBar";
 import {
   Info, Eye, Globe, FileText,
-  Download, ChevronDown, ChevronUp,
-  Heart, AlertTriangle, Lock, Accessibility
+  Download, Heart, AlertTriangle, Lock, Accessibility, X
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useNavigate } from "react-router-dom";
 
-const STYLE_ACTIVE = {
-  borderColor: "#38bdf8",
-  boxShadow: "0 0 0 2px #38bdf8",
-};
+const WS_URL = "ws://192.168.4.1:8081";
+const STYLE_ACTIVE = { borderColor: "#38bdf8", boxShadow: "0 0 0 3px #38bdf8", backgroundColor: "#e0f2fe" };
 
-function InfoCard({ icon: Icon, title, summary, detail, color = "primary", isActive, expanded, onToggle }) {
+function useEMGSimple(wsUrl, onDer, onIzq) {
+  const ws = useRef(null);
+  const cbRef = useRef({ onDer, onIzq });
+  cbRef.current = { onDer, onIzq };
+  useEffect(() => {
+    let last = 0;
+    const DEBOUNCE = 800;
+    ws.current = new WebSocket(wsUrl);
+    ws.current.onmessage = (e) => {
+      const now = Date.now();
+      if (now - last < DEBOUNCE) return;
+      try {
+        const data = JSON.parse(e.data);
+        const izq = data.izq?.click === 1;
+        const der = data.der?.click === 1;
+        if (!izq && !der) return;
+        if (izq && der) return;
+        last = now;
+        if (der) cbRef.current.onDer();
+        if (izq) cbRef.current.onIzq();
+      } catch {}
+    };
+    ws.current.onerror = () => {};
+    ws.current.onclose = () => {};
+    return () => ws.current?.close();
+  }, [wsUrl]);
+}
+
+function ConfirmDialog({ title, subtitle, onConfirm, onCancel, confirmOption, confirmLabel = "✅ Ver más", cancelLabel = "❌ Cancelar" }) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
+      <div className="bg-card rounded-2xl border border-border p-5 max-w-xs w-full soft-shadow text-center space-y-3">
+        <h3 className="text-base font-semibold">{title}</h3>
+        {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+        <div className="flex gap-2">
+          <button onClick={onConfirm} style={confirmOption === 0 ? { backgroundColor: "#7dd3fc", borderColor: "#38bdf8", boxShadow: "0 0 0 2px #38bdf8", color: "#0f172a" } : {}} className="flex-1 h-9 rounded-xl border-2 border-border font-semibold text-xs transition-all">{confirmLabel}</button>
+          <button onClick={onCancel} style={confirmOption === 1 ? { backgroundColor: "#fca5a5", borderColor: "#f87171", boxShadow: "0 0 0 2px #f87171", color: "#0f172a" } : {}} className="flex-1 h-9 rounded-xl border-2 border-border font-semibold text-xs transition-all">{cancelLabel}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CardModal({ section, onClose }) {
   const colorMap = {
     primary: "bg-primary/10 text-primary border-primary/20",
     accent: "bg-accent/10 text-accent-foreground border-accent/30",
@@ -21,59 +61,28 @@ function InfoCard({ icon: Icon, title, summary, detail, color = "primary", isAct
     amber: "bg-amber-500/10 text-amber-700 border-amber-500/20",
     violet: "bg-violet-500/10 text-violet-700 border-violet-500/20",
   };
+  const Icon = section.icon;
   return (
-    <div
-      style={isActive ? STYLE_ACTIVE : {}}
-      className="rounded-3xl border border-border/70 bg-card soft-shadow overflow-hidden transition-all"
-    >
-      <div className="p-6">
-        <div className={cn("w-11 h-11 rounded-2xl flex items-center justify-center mb-4 border", colorMap[color])}>
-          <Icon className="w-5 h-5" />
-        </div>
-        <h3 className="text-lg font-semibold mb-2">{title}</h3>
-        <p className="text-sm text-muted-foreground leading-relaxed">{summary}</p>
-        {expanded && (
-          <div className="mt-4 pt-4 border-t border-border/60 text-sm text-foreground/80 leading-relaxed whitespace-pre-line">
-            {detail}
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6"
+      style={{ backdropFilter: "blur(8px)", backgroundColor: "rgba(0,0,0,0.5)" }}>
+      <div className="bg-card rounded-2xl border border-border soft-shadow w-full max-w-xl max-h-[85vh] flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+          <div className="flex items-center gap-3">
+            <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center border shrink-0", colorMap[section.color])}>
+              <Icon className="w-4 h-4" />
+            </div>
+            <h2 className="text-base font-semibold">{section.title}</h2>
           </div>
-        )}
-      </div>
-      <div className="px-6 pb-5">
-        <button
-          onClick={onToggle}
-          className="flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
-        >
-          {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          {expanded ? "Ocultar" : "Ver más"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function DocCard({ title, preview, filename, isActive, onDownload }) {
-  return (
-    <div
-      style={isActive ? STYLE_ACTIVE : {}}
-      className="rounded-3xl border border-border/70 bg-card soft-shadow overflow-hidden flex flex-col transition-all"
-    >
-      <div className="px-6 pt-6 pb-3 border-b border-border/60">
-        <div className="flex items-center gap-3 mb-2">
-          <FileText className="w-5 h-5 text-primary" />
-          <h3 className="font-semibold">{title}</h3>
+          <button onClick={onClose}
+            style={{ backgroundColor: "#7dd3fc", borderColor: "#38bdf8", boxShadow: "0 0 0 2px #38bdf8", color: "#0f172a" }}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl border-2 font-semibold transition-all text-sm">
+            <X className="w-4 h-4" /> Cerrar
+          </button>
         </div>
-      </div>
-      <div className="flex-1 overflow-y-auto max-h-48 px-6 py-4">
-        <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-sans leading-relaxed">{preview}</pre>
-      </div>
-      <div className="px-6 pb-5 pt-3 border-t border-border/60">
-        <button
-          onClick={onDownload}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all"
-        >
-          <Download className="w-4 h-4" />
-          Descargar documento
-        </button>
+        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-3">
+          <p className="text-sm text-muted-foreground leading-relaxed">{section.summary}</p>
+          <div className="text-sm text-foreground leading-relaxed whitespace-pre-line">{section.detail}</div>
+        </div>
       </div>
     </div>
   );
@@ -90,14 +99,23 @@ const INFO_SECTIONS = [
 
 const DOC_NORMATIVIDAD = `ANÁLISIS DE NORMATIVIDAD Y SUSTENTABILIDAD\nMioAssist — Sistema de Escritura Asistida por EMG\nVersión 1.0 · Abril 2026`;
 const DOC_GUIA = `GUÍA DE USO DEL SISTEMA\nMioAssist — Escritura Asistida por EMG\nVersión 1.0 · Abril 2026`;
-
-// Bloques: 6 InfoCards + 2 DocCards = 8 bloques
-const TOTAL_BLOCKS = INFO_SECTIONS.length + 2;
+const TOTAL_BLOCKS = 9;
 
 export default function InfoPage() {
-  const [expandedCards, setExpandedCards] = useState({});
+  const navigate = useNavigate();
+  const [activeBlock, setActiveBlock] = useState(1);
+  const [navBloqueada, setNavBloqueada] = useState(false);
+  const [navIdx, setNavIdx] = useState(0);
+  const [navConfirmOpen, setNavConfirmOpen] = useState(false);
+  const [navConfirmOption, setNavConfirmOption] = useState(0);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmOption, setConfirmOption] = useState(0);
+  const [modalSection, setModalSection] = useState(null);
+  const [downloadConfirmOpen, setDownloadConfirmOpen] = useState(false);
+  const [downloadConfirmOption, setDownloadConfirmOption] = useState(0);
 
-  const toggleCard = (idx) => setExpandedCards((prev) => ({ ...prev, [idx]: !prev[idx] }));
+  const stateRef = useRef({});
+  stateRef.current = { activeBlock, navBloqueada, navIdx, navConfirmOpen, navConfirmOption, confirmOpen, confirmOption, modalSection, downloadConfirmOpen, downloadConfirmOption };
 
   const handleDownload = (text, filename) => {
     const blob = new Blob([text], { type: "text/plain" });
@@ -107,91 +125,164 @@ export default function InfoPage() {
     URL.revokeObjectURL(url);
   };
 
-  const { activeBlock } = useEMGPage({
-    blockCount: TOTAL_BLOCKS,
-    onBlockAction: (idx) => {
-      if (idx < INFO_SECTIONS.length) {
-        toggleCard(idx);
-      } else {
-        // DocCards — descargar
-        const docIdx = idx - INFO_SECTIONS.length;
-        if (docIdx === 0) handleDownload(DOC_NORMATIVIDAD, "MioAssist_Normatividad_2026.txt");
-        else handleDownload(DOC_GUIA, "MioAssist_Guia_Uso_2026.txt");
-      }
+  useEMGSimple(WS_URL,
+    () => {
+      const s = stateRef.current;
+      if (s.modalSection !== null) return;
+      if (s.navConfirmOpen) { setNavConfirmOption((o) => o === 0 ? 1 : 0); return; }
+      if (s.confirmOpen) { setConfirmOption((o) => o === 0 ? 1 : 0); return; }
+      if (s.downloadConfirmOpen) { setDownloadConfirmOption((o) => o === 0 ? 1 : 0); return; }
+      if (s.activeBlock === 0 && s.navBloqueada) { setNavIdx((i) => (i + 1 >= navItems.length ? 0 : i + 1)); return; }
+      setActiveBlock((b) => (b + 1) % TOTAL_BLOCKS);
     },
-    wsUrl: "ws://192.168.4.1:8081",
-    ownerId: "infopage",
-  });
+    () => {
+      const s = stateRef.current;
+      if (s.modalSection !== null) { setModalSection(null); return; }
+      if (s.navConfirmOpen) {
+        if (s.navConfirmOption === 0) navigate(navItems[s.navIdx].to);
+        else { setNavConfirmOpen(false); setNavConfirmOption(0); }
+        return;
+      }
+      if (s.confirmOpen) {
+        if (s.confirmOption === 0) { setModalSection(s.activeBlock - 1); setConfirmOpen(false); setConfirmOption(0); }
+        else { setConfirmOpen(false); setConfirmOption(0); }
+        return;
+      }
+      if (s.downloadConfirmOpen) {
+        if (s.downloadConfirmOption === 0) {
+          const docIdx = s.activeBlock - INFO_SECTIONS.length - 1;
+          if (docIdx === 0) handleDownload(DOC_NORMATIVIDAD, "MioAssist_Normatividad_2026.txt");
+          else handleDownload(DOC_GUIA, "MioAssist_Guia_Uso_2026.txt");
+          setDownloadConfirmOpen(false); setDownloadConfirmOption(0);
+        } else { setDownloadConfirmOpen(false); setDownloadConfirmOption(0); }
+        return;
+      }
+      if (s.activeBlock === 0) {
+        if (!s.navBloqueada) { setNavBloqueada(true); setNavIdx(0); }
+        else { setNavConfirmOpen(true); setNavConfirmOption(0); }
+        return;
+      }
+      if (s.activeBlock >= 1 && s.activeBlock <= INFO_SECTIONS.length) { setConfirmOpen(true); setConfirmOption(0); return; }
+      if (s.activeBlock > INFO_SECTIONS.length) { setDownloadConfirmOpen(true); setDownloadConfirmOption(0); }
+    }
+  );
+
+  useEffect(() => { if (activeBlock !== 0) { setNavBloqueada(false); setNavIdx(0); } }, [activeBlock]);
+  useEffect(() => {
+    const id = activeBlock === 0 ? "emg-navbar" : `emg-block-${activeBlock}`;
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [activeBlock]);
+
+  const navActive = activeBlock === 0;
+  const colorMap = {
+    primary: "bg-primary/10 text-primary border-primary/20",
+    accent: "bg-accent/10 text-accent-foreground border-accent/30",
+    emerald: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20",
+    amber: "bg-amber-500/10 text-amber-700 border-amber-500/20",
+    violet: "bg-violet-500/10 text-violet-700 border-violet-500/20",
+  };
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
-      <main className="max-w-[1400px] mx-auto px-4 sm:px-8 py-8 lg:py-12">
+      {modalSection !== null && <CardModal section={INFO_SECTIONS[modalSection]} onClose={() => setModalSection(null)} />}
+      {navConfirmOpen && <ConfirmDialog title={navItems[navIdx].label} subtitle="¿Ir a esta sección?" confirmOption={navConfirmOption} confirmLabel="✅ Confirmar" onConfirm={() => navigate(navItems[navIdx].to)} onCancel={() => { setNavConfirmOpen(false); setNavConfirmOption(0); }} />}
+      {confirmOpen && activeBlock >= 1 && activeBlock <= INFO_SECTIONS.length && (
+        <ConfirmDialog title={INFO_SECTIONS[activeBlock - 1].title} subtitle="¿Quieres leer más?" confirmOption={confirmOption}
+          onConfirm={() => { setModalSection(activeBlock - 1); setConfirmOpen(false); setConfirmOption(0); }}
+          onCancel={() => { setConfirmOpen(false); setConfirmOption(0); }} />
+      )}
+      {downloadConfirmOpen && (
+        <ConfirmDialog title="Descargar documento" subtitle="¿Quieres descargar este documento?" confirmOption={downloadConfirmOption} confirmLabel="✅ Descargar"
+          onConfirm={() => {
+            const docIdx = activeBlock - INFO_SECTIONS.length - 1;
+            if (docIdx === 0) handleDownload(DOC_NORMATIVIDAD, "MioAssist_Normatividad_2026.txt");
+            else handleDownload(DOC_GUIA, "MioAssist_Guia_Uso_2026.txt");
+            setDownloadConfirmOpen(false); setDownloadConfirmOption(0);
+          }}
+          onCancel={() => { setDownloadConfirmOpen(false); setDownloadConfirmOption(0); }} />
+      )}
 
-        <div className="mb-10">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-primary">Centro de información</span>
+      <main className="max-w-[1600px] mx-auto px-3 sm:px-6 py-5 space-y-4">
+
+        <div id="emg-navbar" style={navActive ? { outline: "3px solid #38bdf8", outlineOffset: "4px", borderRadius: "1rem", backgroundColor: "#e0f2fe" } : {}}>
+          <NavBar bloqueada={navBloqueada} selectedIdx={navIdx} />
+        </div>
+
+        <div>
+          <div className="flex items-center gap-1.5 mb-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">Centro de información</span>
             <span className="w-1 h-1 rounded-full bg-muted-foreground" />
-            <span className="text-xs text-muted-foreground">Ética · Privacidad · Seguridad · Accesibilidad</span>
+            <span className="text-[10px] text-muted-foreground">Ética · Privacidad · Seguridad · Accesibilidad</span>
           </div>
-          <h2 className="text-4xl sm:text-5xl font-light tracking-tight mb-3">
-            Información <span className="font-semibold">importante</span>
-          </h2>
-          <p className="text-muted-foreground max-w-2xl">
-            MioAssist opera bajo principios éticos, legales y clínicos estrictos.
-          </p>
+          <h2 className="text-2xl sm:text-3xl font-light tracking-tight">Información <span className="font-semibold">importante</span></h2>
+          <p className="text-muted-foreground mt-0.5 text-sm">MioAssist opera bajo principios éticos, legales y clínicos estrictos.</p>
         </div>
 
-        <div className="mb-8 rounded-2xl border border-amber-500/30 bg-amber-500/8 px-5 py-4 flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
-          <div>
-            <div className="font-semibold text-amber-800 text-sm">Aviso importante</div>
-            <div className="text-amber-700 text-sm mt-0.5">
-              MioAssist es un sistema de <strong>asistencia para la comunicación</strong>, no un dispositivo de diagnóstico médico.
-            </div>
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/8 px-4 py-2.5 flex items-center gap-2.5">
+          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+          <p className="text-xs text-amber-700"><strong className="text-amber-800">Aviso importante —</strong> MioAssist es un sistema de <strong>asistencia para la comunicación</strong>, no un dispositivo de diagnóstico médico.</p>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-semibold mb-2.5 flex items-center gap-1.5"><Info className="w-3.5 h-3.5 text-primary" /> Secciones informativas</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {INFO_SECTIONS.map((s, i) => {
+              const blockIdx = i + 1;
+              const isActive = activeBlock === blockIdx;
+              const Icon = s.icon;
+              return (
+                <div key={s.title} id={`emg-block-${blockIdx}`}
+                  style={isActive ? STYLE_ACTIVE : {}}
+                  className="rounded-2xl border border-border/70 bg-card soft-shadow p-4 flex flex-col gap-2.5 transition-all cursor-pointer hover:border-accent/50"
+                  onClick={() => setModalSection(i)}>
+                  <div className="flex items-center gap-2.5">
+                    <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center border shrink-0", colorMap[s.color])}>
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <h3 className="font-semibold text-sm">{s.title}</h3>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed flex-1">{s.summary}</p>
+                  <span className="text-xs font-semibold text-primary">Ver más →</span>
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        <section className="mb-14">
-          <h3 className="text-xl font-semibold mb-5 flex items-center gap-2">
-            <Info className="w-5 h-5 text-primary" /> Secciones informativas
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {INFO_SECTIONS.map((s, i) => (
-              <div key={s.title} id={`emg-block-${i}`}>
-                <InfoCard
-                  {...s}
-                  isActive={activeBlock === i}
-                  expanded={!!expandedCards[i]}
-                  onToggle={() => toggleCard(i)}
-                />
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section>
-          <h3 className="text-xl font-semibold mb-2 flex items-center gap-2">
-            <FileText className="w-5 h-5 text-primary" /> Documentos
-          </h3>
-          <p className="text-sm text-muted-foreground mb-5">Documentos técnicos y guías disponibles para descarga.</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div>
+          <h3 className="text-sm font-semibold mb-1 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-primary" /> Documentos</h3>
+          <p className="text-xs text-muted-foreground mb-2.5">Documentos técnicos y guías disponibles para descarga.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {[
               { title: "Análisis de Normatividad y Sustentabilidad", text: DOC_NORMATIVIDAD, filename: "MioAssist_Normatividad_2026.txt" },
               { title: "Guía de uso del sistema", text: DOC_GUIA, filename: "MioAssist_Guia_Uso_2026.txt" },
-            ].map((doc, i) => (
-              <div key={doc.title} id={`emg-block-${INFO_SECTIONS.length + i}`}>
-                <DocCard
-                  title={doc.title}
-                  preview={doc.text}
-                  filename={doc.filename}
-                  isActive={activeBlock === INFO_SECTIONS.length + i}
-                  onDownload={() => handleDownload(doc.text, doc.filename)}
-                />
-              </div>
-            ))}
+            ].map((doc, i) => {
+              const blockIdx = INFO_SECTIONS.length + 1 + i;
+              const isActive = activeBlock === blockIdx;
+              return (
+                <div key={doc.title} id={`emg-block-${blockIdx}`}
+                  style={isActive ? STYLE_ACTIVE : {}}
+                  className="rounded-2xl border border-border/70 bg-card soft-shadow px-4 py-3 flex items-center justify-between gap-3 transition-all">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                      <FileText className="w-4 h-4 text-primary" />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-sm">{doc.title}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">Versión 1.0 · Abril 2026</div>
+                    </div>
+                  </div>
+                  <button onClick={() => handleDownload(doc.text, doc.filename)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-all shrink-0">
+                    <Download className="w-3.5 h-3.5" /> Descargar
+                  </button>
+                </div>
+              );
+            })}
           </div>
-        </section>
+        </div>
+
       </main>
     </div>
   );

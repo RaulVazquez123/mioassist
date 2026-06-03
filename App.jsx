@@ -18,7 +18,7 @@ import { EMGProvider } from '@/lib/EMGContext';
 import ElectrodosBanner from '@/components/layout/ElectrodosBanner';
 
 const AuthenticatedApp = () => {
-  const { user, isLoadingAuth, login } = useAuth();
+  const { user, isLoadingAuth } = useAuth();
   const [consentGiven, setConsentGiven] = useState(false);
 
   useEffect(() => {
@@ -41,11 +41,10 @@ const AuthenticatedApp = () => {
   if (!user) {
     return (
       <Routes>
-        <Route path="/landing" element={<Landing />} />
-        <Route path="/privacy" element={<PrivacyPage />} />
-        <Route path="/legal"   element={<LegalPage />} />
-        <Route path="/info"    element={<InfoPage />} />
-        <Route path="*"        element={<AuthPage />} />
+        <Route path="/privacy"  element={<PrivacyPage />} />
+        <Route path="/legal"    element={<LegalPage />} />
+        <Route path="/info"     element={<InfoPage />} />
+        <Route path="*"         element={<AuthPage />} />
       </Routes>
     );
   }
@@ -55,14 +54,14 @@ const AuthenticatedApp = () => {
       <ElectrodosBanner />
       {!consentGiven && <ConsentModal onAccept={handleAcceptConsent} />}
       <Routes>
-        <Route path="/landing"  element={<Landing />} />
+        <Route path="/"         element={<Landing />} />
+        <Route path="/writer"   element={<Writer />} />
         <Route path="/privacy"  element={<PrivacyPage />} />
         <Route path="/legal"    element={<LegalPage />} />
         <Route path="/info"     element={<InfoPage />} />
-        <Route path="/"         element={<Writer />} />
         <Route path="/profile"  element={<Profile />} />
         <Route path="/practice" element={<Practice />} />
-        <Route path="*"         element={<Writer />} />
+        <Route path="*"         element={<Landing />} />
       </Routes>
     </>
   );
@@ -72,7 +71,7 @@ function App() {
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
-        <EMGProvider wsUrl="ws://localhost:8081">
+        <EMGProvider wsUrl="ws://192.168.4.1:8081">
           <Router>
             <AuthenticatedApp />
           </Router>

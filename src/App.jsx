@@ -36,7 +36,8 @@ const AuthenticatedApp = () => {
 
   return (
     <Routes>
-      <Route path="/" element={<Writer />} />
+      <Route path="/" element={<Landing />} />
+      <Route path="/writer" element={<Writer />} />
       <Route path="/profile" element={<Profile />} />
       <Route path="/practice" element={<Practice />} />
       <Route path="/info" element={<InfoPage />} />
@@ -53,9 +54,6 @@ function App() {
       <QueryClientProvider client={queryClientInstance}>
         <Router>
           <Routes>
-            {/* Ruta pública — no requiere auth */}
-            <Route path="/landing" element={<Landing />} />
-            {/* Rutas protegidas */}
             <Route path="/*" element={<AuthenticatedApp />} />
           </Routes>
         </Router>

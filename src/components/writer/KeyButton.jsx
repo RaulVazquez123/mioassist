@@ -22,7 +22,7 @@ export default function KeyButton({
       onClick={onClick}
       aria-label={ariaLabel}
       className={cn(
-        "h-16 sm:h-[70px] rounded-2xl border-2 font-medium text-xl sm:text-2xl transition-all duration-150 active:scale-[0.96] key-shadow select-none flex items-center justify-center gap-1",
+        "h-11 sm:h-12 rounded-xl border-2 font-medium text-base sm:text-lg transition-all duration-150 active:scale-[0.96] key-shadow select-none flex items-center justify-center gap-0.5",
         variants[variant],
         className
       )}

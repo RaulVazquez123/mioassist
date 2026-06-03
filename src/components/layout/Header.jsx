@@ -35,7 +35,7 @@ export default function Header({ zona, headerIndex = 0 }) {
   useEffect(() => {
     if (isWriter || pathname === "/profile") { releaseEMG("header"); return; }
 
-    console.log("[EMG] Header haciendo claimEMG"); claimEMG("header",
+    claimEMG("header",
       () => {
         const { confirmOpen } = stateRef.current;
         if (confirmOpen) { setConfirmOption((o) => o === 0 ? 1 : 0); return; }
@@ -58,7 +58,6 @@ export default function Header({ zona, headerIndex = 0 }) {
       }
     );
     return () => releaseEMG("header");
-    return () => releaseEMG("header");
   }, [isWriter, pathname]);
 
   const handleLogout = () => logout();
@@ -70,24 +69,24 @@ export default function Header({ zona, headerIndex = 0 }) {
     <>
       {confirmOpen && emgIndex !== null && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
-          <div className="bg-card rounded-3xl border border-border p-8 max-w-sm w-full soft-shadow text-center space-y-5">
-            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
-              {React.createElement(navItems[emgIndex].icon, { className: "w-6 h-6 text-primary" })}
+          <div className="bg-card rounded-2xl border border-border p-5 max-w-xs w-full soft-shadow text-center space-y-3">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center mx-auto">
+              {React.createElement(navItems[emgIndex].icon, { className: "w-4 h-4 text-primary" })}
             </div>
             <div>
-              <h3 className="text-xl font-semibold">{navItems[emgIndex].label}</h3>
-              <p className="text-sm text-muted-foreground mt-1">¿Ir a esta sección?</p>
+              <h3 className="text-base font-semibold">{navItems[emgIndex].label}</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">¿Ir a esta sección?</p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-2">
               <button
                 onClick={() => { navigate(navItems[emgIndex].to); setConfirmOpen(false); setEmgIndex(null); }}
                 style={confirmOption === 0 ? STYLE_CONFIRM_OK : {}}
-                className="flex-1 h-12 rounded-2xl border-2 border-border font-semibold text-sm transition-all"
+                className="flex-1 h-9 rounded-xl border-2 border-border font-semibold text-xs transition-all"
               >✅ Confirmar</button>
               <button
                 onClick={() => { setConfirmOpen(false); setConfirmOption(0); }}
                 style={confirmOption === 1 ? STYLE_CONFIRM_NO : {}}
-                className="flex-1 h-12 rounded-2xl border-2 border-border font-semibold text-sm transition-all"
+                className="flex-1 h-9 rounded-xl border-2 border-border font-semibold text-xs transition-all"
               >❌ Cancelar</button>
             </div>
           </div>
@@ -95,27 +94,27 @@ export default function Header({ zona, headerIndex = 0 }) {
       )}
 
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/90 backdrop-blur-xl">
-        <div className="max-w-[1600px] mx-auto px-4 sm:px-8 h-24 flex items-center justify-between gap-5">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
 
-          <button type="button" onClick={() => navigate("/")} className="flex items-center gap-4 group text-left shrink-0">
-            <Logo size={56} />
+          <button type="button" onClick={() => navigate("/")} className="flex items-center gap-2 group text-left shrink-0">
+            <Logo size={36} />
             <div className="leading-tight">
-              <div className="flex items-center gap-2.5">
-                <h1 className="text-2xl font-semibold tracking-tight">
+              <div className="flex items-center gap-1.5">
+                <h1 className="text-base font-semibold tracking-tight">
                   Mio<span className="text-primary">Assist</span>
                 </h1>
-                <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-accent-foreground bg-accent/20 border border-accent/30 rounded-full px-2.5 py-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                <span className="hidden sm:inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wider text-accent-foreground bg-accent/20 border border-accent/30 rounded-full px-2 py-0.5">
+                  <span className="w-1 h-1 rounded-full bg-accent animate-pulse" />
                   EMG live
                 </span>
               </div>
-              <p className="text-sm text-muted-foreground hidden sm:block mt-1">
+              <p className="text-xs text-muted-foreground hidden sm:block">
                 Asistencia inteligente para escritura mediante EMG
               </p>
             </div>
           </button>
 
-          <nav className="flex items-center gap-1.5 p-1.5 rounded-full bg-secondary/70 border border-border/60">
+          <nav className="flex items-center gap-1 p-1 rounded-full bg-secondary/70 border border-border/60">
             {navItems.map(({ to, label, icon: Icon }, i) => {
               const active   = pathname === to;
               const selected = activeZona === "header" && activeEmgIndex === i;
@@ -126,37 +125,37 @@ export default function Header({ zona, headerIndex = 0 }) {
                   onClick={() => navigate(to)}
                   style={selected ? { borderColor: "#38bdf8", boxShadow: "0 0 0 2px #38bdf8", backgroundColor: "#7dd3fc", color: "#0f172a" } : {}}
                   className={cn(
-                    "flex items-center gap-2 px-5 py-2.5 rounded-full text-base font-medium transition-all border border-transparent",
+                    "flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium transition-all border border-transparent",
                     active && !selected ? "bg-card text-primary soft-shadow" : "text-muted-foreground hover:text-foreground",
                   )}
                 >
-                  <Icon className="w-4 h-4" />
+                  <Icon className="w-3.5 h-3.5" />
                   <span className="hidden md:inline">{label}</span>
                 </button>
               );
             })}
           </nav>
 
-          <div className="hidden lg:flex items-center gap-3 shrink-0">
-            <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-card border border-border/60 soft-shadow">
-              <Activity className="w-4 h-4 text-accent" />
-              <span className="text-sm font-medium tabular-nums text-muted-foreground">Señal 74%</span>
+          <div className="hidden lg:flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-card border border-border/60 soft-shadow">
+              <Activity className="w-3.5 h-3.5 text-accent" />
+              <span className="text-xs font-medium tabular-nums text-muted-foreground">Señal 74%</span>
             </div>
             {user && (
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-card border border-border/60 soft-shadow">
-                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-primary to-cyan-400 flex items-center justify-center text-white text-xs font-bold shrink-0">
+              <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-card border border-border/60 soft-shadow">
+                  <div className="w-5 h-5 rounded-full bg-gradient-to-br from-primary to-cyan-400 flex items-center justify-center text-white text-xs font-bold shrink-0">
                     {user.nombre?.charAt(0).toUpperCase() || "U"}
                   </div>
-                  <span className="text-sm font-medium text-foreground max-w-[120px] truncate">
+                  <span className="text-xs font-medium text-foreground max-w-[100px] truncate">
                     {user.nombre?.split(" ")[0]}
                   </span>
                 </div>
                 <button
                   onClick={handleLogout}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-full border border-border/60 bg-card text-sm font-medium text-muted-foreground hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-all soft-shadow"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-full border border-border/60 bg-card text-xs font-medium text-muted-foreground hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-all soft-shadow"
                 >
-                  <LogOut className="w-4 h-4" />
+                  <LogOut className="w-3.5 h-3.5" />
                   <span className="hidden xl:inline">Salir</span>
                 </button>
               </div>

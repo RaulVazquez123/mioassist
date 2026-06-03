@@ -23,7 +23,7 @@ const LETTER_ROWS = [
   ["z","x","c","v","b","n","m"],
   ["á","é","í","ó","ú"],
   ["SHIFT","123","ESPACIO","BORRAR","LIMPIAR","DICCIONARIO"],
-  ["COMPARTIR","PRACTICA","PERFIL"],
+  ["COMPARTIR","PRACTICA","PERFIL","INFO","LEGAL","PRIVACIDAD"],
 ];
 
 const NUM_ROWS = [
@@ -31,7 +31,7 @@ const NUM_ROWS = [
   ["@","#","$","%","&","*","(",")","−","_"],
   [".",",","?","!",";",":","/" ],
   ["SHIFT","123","ESPACIO","BORRAR","LIMPIAR","DICCIONARIO"],
-  ["COMPARTIR","PRACTICA","PERFIL"],
+  ["COMPARTIR","PRACTICA","PERFIL","INFO","LEGAL","PRIVACIDAD"],
 ];
 
 export default function Writer() {
@@ -44,7 +44,6 @@ export default function Writer() {
   const [shift, setShift] = useState(true);
   const [numMode, setNumMode] = useState(false);
 
-  // Zona para navegación por teclado físico (flechas)
   const [zona, setZona] = useState("top");
   const [headerIndex, setHeaderIndex] = useState(0);
   const [actionIndex, setActionIndex] = useState(0);
@@ -53,9 +52,8 @@ export default function Writer() {
   const [kbRow, setKbRow] = useState(0);
   const [kbCol, setKbCol] = useState(0);
 
-  // Estado exclusivo para navegación EMG
   const [filaBlockeada, setFilaBloqueada] = useState(false);
-  const [emgZona, setEmgZona] = useState("top"); // "top" | "keyboard" | "dictionary" | "actions"
+  const [emgZona, setEmgZona] = useState("top");
   const [emgTopIndex, setEmgTopIndex] = useState(0);
   const [emgDictIndex, setEmgDictIndex] = useState(0);
   const [emgActionIndex, setEmgActionIndex] = useState(0);
@@ -114,16 +112,9 @@ export default function Writer() {
   };
 
   const ACTION_HANDLERS = [
-    // Copiar
-    async () => {
-      if (!text.trim()) return;
-      await navigator.clipboard.writeText(text);
-    },
-    // WhatsApp
+    async () => { if (!text.trim()) return; await navigator.clipboard.writeText(text); },
     () => { if (!text.trim()) return; window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank"); },
-    // Publicar en X
     () => { if (!text.trim()) return; window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, "_blank"); },
-    // Descargar
     () => {
       if (!text.trim()) return;
       const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
@@ -132,7 +123,6 @@ export default function Writer() {
       a.href = url; a.download = `mioassist-${Date.now()}.txt`; a.click();
       URL.revokeObjectURL(url);
     },
-    // Leer en voz
     () => {
       if (!text.trim() || !("speechSynthesis" in window)) return;
       const utter = new SpeechSynthesisUtterance(text);
@@ -142,9 +132,7 @@ export default function Writer() {
     },
   ];
 
-  const onExecuteAction = (index) => {
-    ACTION_HANDLERS[index]?.();
-  };
+  const onExecuteAction = (index) => ACTION_HANDLERS[index]?.();
 
   const ejecutarTecla = (value) => {
     if (value === "ESPACIO")     return handleSpace();
@@ -155,7 +143,10 @@ export default function Writer() {
     if (value === "123")         { setNumMode((n) => !n); setKbRow(0); setKbCol(0); return; }
     if (value === "PRACTICA")    { window.location.href = "/practice"; return; }
     if (value === "PERFIL")      { window.location.href = "/profile"; return; }
-    if (value === "COMPARTIR")   { console.log("COMPARTIR ejecutado"); openSharing(); return; }
+    if (value === "INFO")        { window.location.href = "/info"; return; }
+    if (value === "LEGAL")       { window.location.href = "/legal"; return; }
+    if (value === "PRIVACIDAD")  { window.location.href = "/privacy"; return; }
+    if (value === "COMPARTIR")   { openSharing(); return; }
     const ch = (shift && !numMode) ? value.toUpperCase() : value;
     handleType(ch);
     if (shift && !numMode) setShift(false);
@@ -247,7 +238,6 @@ export default function Writer() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [zona, headerIndex, actionIndex, topIndex, suggestionIndex, kbRow, kbCol, topLettersData, suggestionsData, shift, numMode]);
 
-  // Hook de navegación EMG
   useEMGKeyboard({
     activeRows,
     kbRow,    setKbRow,
@@ -263,25 +253,16 @@ export default function Writer() {
     onSelectWord: replaceCurrentWord,
     onOpenDictionary: openDictionary,
     onExecuteAction,
-    wsUrl: "ws://192.168.4.1:8081",
+    wsUrl: "ws://localhost:8081",
   });
 
-  // Sincronizar emgTopIndex con topIndex para que el resaltado se vea
+  useEffect(() => { setTopIndex(emgTopIndex); }, [emgTopIndex]);
   useEffect(() => {
-    setTopIndex(emgTopIndex);
-  }, [emgTopIndex]);
-
-  // Sincronizar emgZona con zona para resaltado visual
-  useEffect(() => {
-    if (emgZona === "top")      setZona("top");
-    if (emgZona === "keyboard") setZona("keyboard");
+    if (emgZona === "top")        setZona("top");
+    if (emgZona === "keyboard")   setZona("keyboard");
     if (emgZona === "dictionary") setZona("suggestions");
   }, [emgZona]);
-
-  // Sincronizar dictIndex con suggestionIndex para resaltado
-  useEffect(() => {
-    setSuggestionIndex(emgDictIndex);
-  }, [emgDictIndex]);
+  useEffect(() => { setSuggestionIndex(emgDictIndex); }, [emgDictIndex]);
 
   return (
     <div className="min-h-screen bg-background">

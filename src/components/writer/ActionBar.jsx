@@ -43,10 +43,7 @@ export default function ActionBar({ text, emgZona, emgActionIndex }) {
 
   const handleSpeak = () => {
     if (disabled) return;
-    if (!("speechSynthesis" in window)) {
-      toast.error("Tu navegador no soporta lectura en voz");
-      return;
-    }
+    if (!("speechSynthesis" in window)) { toast.error("Tu navegador no soporta lectura en voz"); return; }
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang = "es-ES";
     speechSynthesis.cancel();
@@ -62,7 +59,7 @@ export default function ActionBar({ text, emgZona, emgActionIndex }) {
   ];
 
   return (
-    <div className="flex flex-wrap gap-2 sm:gap-3">
+    <div className="flex flex-wrap gap-1.5 sm:gap-2">
       {actions.map(({ key, label, icon: Icon, onClick, tone }, i) => {
         const isSelected = emgZona === "actions" && emgActionIndex === i;
         return (
@@ -71,15 +68,15 @@ export default function ActionBar({ text, emgZona, emgActionIndex }) {
             onClick={onClick}
             disabled={disabled}
             variant="outline"
-            size="lg"
+            size="sm"
             style={isSelected ? STYLE_SELECTED : STYLE_DEFAULT}
             className={cn(
-              "h-12 px-5 rounded-2xl border-border/70 bg-card hover:bg-secondary transition-all soft-shadow",
+              "h-8 px-3 rounded-xl border-border/70 bg-card hover:bg-secondary transition-all soft-shadow text-xs",
               tone === "accent" && "hover:border-accent hover:text-accent-foreground",
               tone === "green"  && "hover:border-emerald-500/50 hover:text-emerald-600",
             )}
           >
-            <Icon className="w-4 h-4 mr-2" />
+            <Icon className="w-3.5 h-3.5 mr-1.5" />
             <span className="font-medium">{label}</span>
           </Button>
         );

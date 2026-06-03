@@ -65,14 +65,14 @@ export default function CloudExport({ activeBlock, downloadBtnId, reportBtnId })
       <div className="mt-4 grid grid-cols-2 gap-2">
         <button
           id={downloadBtnId}
-          style={activeBlock === 2 ? STYLE_ACTIVE : {}}
+          style={activeBlock === 3 ? STYLE_ACTIVE : {}}
           className="h-9 rounded-xl text-xs gap-1.5 border-2 border-border flex items-center justify-center font-medium transition-all hover:bg-secondary"
         >
           <Download className="w-3.5 h-3.5" /> Descargar
         </button>
         <button
           id={reportBtnId}
-          style={activeBlock === 3 ? STYLE_ACTIVE : {}}
+          style={activeBlock === 4 ? STYLE_ACTIVE : {}}
           className="h-9 rounded-xl text-xs gap-1.5 bg-primary text-primary-foreground border-2 border-transparent flex items-center justify-center font-medium transition-all"
         >
           <Cloud className="w-3.5 h-3.5" /> Generar reporte
