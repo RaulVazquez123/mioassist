@@ -1,12 +1,13 @@
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import Logo from "@/components/brand/Logo";
-import { Activity, User, Dumbbell, Keyboard, LogOut, Info, Scale, Shield } from "lucide-react";
+import { User, Dumbbell, Keyboard, LogOut, Info, Scale, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/AuthContext";
+import { useEMG } from "@/lib/EMGContext";
 
 export const navItems = [
-  { to: "/writer",         label: "Escritura",   icon: Keyboard },
+  { to: "/writer",   label: "Escritura",   icon: Keyboard },
   { to: "/profile",  label: "Perfil EMG",  icon: User },
   { to: "/practice", label: "Práctica",    icon: Dumbbell },
   { to: "/info",     label: "Información", icon: Info },
@@ -18,6 +19,7 @@ export default function NavBar({ bloqueada = false, selectedIdx = 0 }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { user, logout } = useAuth();
+  const { connected } = useEMG();
 
   return (
     <header className="border-b border-border/60 bg-background/90 backdrop-blur-xl">
@@ -28,9 +30,12 @@ export default function NavBar({ bloqueada = false, selectedIdx = 0 }) {
           <div className="leading-tight">
             <div className="flex items-center gap-1.5">
               <h1 className="text-base font-semibold tracking-tight">Mio<span className="text-primary">Assist</span></h1>
-              <span className="hidden sm:inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wider text-accent-foreground bg-accent/20 border border-accent/30 rounded-full px-2 py-0.5">
-                <span className="w-1 h-1 rounded-full bg-accent animate-pulse" />
-                EMG live
+              <span className={cn("hidden sm:inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wider rounded-full px-2 py-0.5 border", connected ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-700" : "bg-red-500/20 border-red-500/40 text-red-700")}>
+                <span className={cn(
+                  "w-1.5 h-1.5 rounded-full",
+                  connected ? "bg-emerald-500 animate-pulse" : "bg-red-500"
+                )} />
+                {connected ? "EMG live" : "EMG off"}
               </span>
             </div>
             <p className="text-xs text-muted-foreground hidden sm:block">Asistencia inteligente para escritura mediante EMG</p>
@@ -60,10 +65,6 @@ export default function NavBar({ bloqueada = false, selectedIdx = 0 }) {
         </nav>
 
         <div className="hidden lg:flex items-center gap-2 shrink-0">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-card border border-border/60 soft-shadow">
-            <Activity className="w-3.5 h-3.5 text-accent" />
-            <span className="text-xs font-medium tabular-nums text-muted-foreground">Señal 74%</span>
-          </div>
           {user && (
             <div className="flex items-center gap-1.5">
               <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-card border border-border/60 soft-shadow">

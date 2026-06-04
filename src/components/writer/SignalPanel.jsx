@@ -19,19 +19,19 @@ export default function SignalPanel() {
           </span>
         </div>
         <span className="text-xs font-medium tabular-nums opacity-80">
-          {rmsActual > 0 ? `${rmsActual.toFixed(1)} µV` : "— µV"}
+          {rmsActual > 0 ? `${rmsActual.toFixed(1)} mV` : "— mV"}
         </span>
       </div>
       <EMGStatusBar />
       <div className="relative mt-4 grid grid-cols-3 gap-3 text-xs">
         <div>
           <div className="opacity-70">Umbral</div>
-          <div className="font-semibold tabular-nums text-sm">{umbral} µV</div>
+          <div className="font-semibold tabular-nums text-sm">{umbral}mV</div>
         </div>
         <div>
           <div className="opacity-70">Pico</div>
           <div className="font-semibold tabular-nums text-sm">
-            {pico > 0 ? `${pico.toFixed(1)} µV` : "— µV"}
+            {pico > 0 ? `${pico.toFixed(1)} mV` : "— mV"}
           </div>
         </div>
         <div>

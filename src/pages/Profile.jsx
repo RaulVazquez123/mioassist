@@ -6,7 +6,7 @@ import SignalGauge from "@/components/profile/SignalGauge";
 import ProgressChart from "@/components/profile/ProgressChart";
 import CloudExport from "@/components/profile/CloudExport";
 import UserDataForm from "@/components/profile/UserDataForm";
-import { Activity, Target, Clock, MousePointerClick, Gauge, Zap, User } from "lucide-react";
+import { Activity, Clock, MousePointerClick, Timer, Zap, User, BarChart2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEMG } from "@/lib/EMGContext";
 import { useNavigate } from "react-router-dom";
@@ -74,17 +74,32 @@ export default function Profile() {
   const [navConfirmOpen, setNavConfirmOpen] = useState(false);
   const [navConfirmOption, setNavConfirmOption] = useState(0);
 
+  // Tiempo de sesión
   const [sessionStart] = useState(Date.now());
-  const [now, setNow] = React.useState(Date.now());
-  React.useEffect(() => {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 60000);
     return () => clearInterval(t);
   }, []);
 
-  const minutos = Math.floor((now - sessionStart) / 60000);
-  const horasStr = `${Math.floor(minutos / 60)}:${String(minutos % 60).padStart(2, "0")}`;
-  const avgRms  = connected && rmsActual > 0 ? Math.round(rmsActual) : 68;
-  const picoRms = connected && pico > 0      ? Math.round(pico)      : 118;
+  // Interacciones EMG — contador real de clicks en esta sesión
+  const [interacciones, setInteracciones] = useState(0);
+  const interaccionesRef = useRef(0);
+
+  const minutos = Math.max((now - sessionStart) / 60000, 0.1);
+  const horasStr = `${Math.floor(Math.floor(minutos) / 60)}:${String(Math.floor(minutos) % 60).padStart(2, "0")}`;
+  const cadencia = interacciones > 0 ? Math.round((minutos * 60) / interacciones) : null;
+
+  // Sesiones totales — localStorage
+  const [sessionesTotales] = useState(() => {
+    const prev = parseInt(localStorage.getItem("mioassist_sesiones") || "0");
+    const nueva = prev + 1;
+    localStorage.setItem("mioassist_sesiones", String(nueva));
+    return nueva;
+  });
+
+  const avgRms  = connected && rmsActual > 0 ? Math.round(rmsActual) : 0;
+  const picoRms = connected && pico > 0      ? Math.round(pico)      : 0;
 
   const stateRef = useRef({});
   stateRef.current = { activeBlock, navBloqueada, navIdx, navConfirmOpen, navConfirmOption };
@@ -92,12 +107,18 @@ export default function Profile() {
   useEMGSimple(WS_URL,
     () => {
       const s = stateRef.current;
+      // Contar interacción derecha
+      interaccionesRef.current += 1;
+      setInteracciones(interaccionesRef.current);
       if (s.navConfirmOpen) { setNavConfirmOption((o) => o === 0 ? 1 : 0); return; }
       if (s.activeBlock === 0 && s.navBloqueada) { setNavIdx((i) => (i + 1 >= navItems.length ? 0 : i + 1)); return; }
       setActiveBlock((b) => (b + 1) % TOTAL_BLOCKS);
     },
     () => {
       const s = stateRef.current;
+      // Contar interacción izquierda
+      interaccionesRef.current += 1;
+      setInteracciones(interaccionesRef.current);
       if (s.navConfirmOpen) {
         if (s.navConfirmOption === 0) navigate(navItems[s.navIdx].to);
         else { setNavConfirmOpen(false); setNavConfirmOption(0); }
@@ -115,8 +136,8 @@ export default function Profile() {
     }
   );
 
-  React.useEffect(() => { if (activeBlock !== 0) { setNavBloqueada(false); setNavIdx(0); } }, [activeBlock]);
-  React.useEffect(() => {
+  useEffect(() => { if (activeBlock !== 0) { setNavBloqueada(false); setNavIdx(0); } }, [activeBlock]);
+  useEffect(() => {
     const id = activeBlock === 0 ? "emg-navbar" : `emg-block-${activeBlock}`;
     const el = document.getElementById(id);
     if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -137,13 +158,12 @@ export default function Profile() {
           <NavBar bloqueada={navBloqueada} selectedIdx={navIdx} />
         </div>
 
-        {/* Header + tabs en una sola línea */}
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-1.5 mb-0.5">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">Perfil clínico</span>
               <span className="w-1 h-1 rounded-full bg-muted-foreground" />
-              <span className="text-[10px] text-muted-foreground">{minutos} min activos</span>
+              <span className="text-[10px] text-muted-foreground">{Math.floor(minutos)} min activos</span>
             </div>
             <h2 className="text-xl font-light tracking-tight">Perfil <span className="font-semibold">del paciente</span></h2>
           </div>
@@ -161,23 +181,20 @@ export default function Profile() {
 
         {tab === "metrics" && (
           <div className="space-y-2">
-            {/* Fila 1 — 4 stat cards iguales */}
             <div className="grid grid-cols-4 gap-2">
-              <StatCard label="Señal EMG promedio" value={avgRms} unit="µV" icon={Activity} tone="primary" hint={connected ? "En vivo" : "Rango óptimo"} />
-              <StatCard label="Intensidad máxima" value={picoRms} unit="µV" icon={Zap} hint="Pico de sesión" />
-              <StatCard label="Precisión" value="89" unit="%" icon={Target} tone="accent" hint="+4% vs ayer" />
-              <StatCard label="Velocidad" value="24" unit="PPM" icon={Gauge} hint="Palabras/min" />
+              <StatCard label="Señal EMG promedio" value={connected ? avgRms : "—"} unit={connected ? "mV" : ""} icon={Activity} tone="primary" hint={connected ? "En vivo" : "Sin conexión"} />
+              <StatCard label="Intensidad máxima" value={connected ? picoRms : "—"} unit={connected ? "mV" : ""} icon={Zap} hint="Pico de sesión" />
+              <StatCard label="Sesiones totales" value={sessionesTotales} icon={BarChart2} tone="accent" hint="Historial acumulado" />
+              <StatCard label="Cadencia muscular" value={cadencia ?? "—"} unit={cadencia ? "s/act" : ""} icon={Timer} hint="Seg. por activación" />
             </div>
 
-            {/* Fila 2 — 4 cards altura fija */}
             <div className="grid grid-cols-4 gap-2">
-              <StatCard label="Tiempo de uso" value={horasStr} unit="h" icon={Clock} hint="Meta: 2:00 h" />
-              <StatCard label="Interacciones" value="1.284" icon={MousePointerClick} hint="Activaciones" />
+              <StatCard label="Tiempo de uso" value={horasStr} unit="h" icon={Clock} hint="Sesión actual" />
+              <StatCard label="Interacciones" value={interacciones} icon={MousePointerClick} hint="Esta sesión" />
               <SignalGauge avg={avgRms} max={picoRms} />
               <FatigueMeter />
             </div>
 
-            {/* Fila 3 — chart + cloud */}
             <div className="grid grid-cols-3 gap-2 items-stretch">
               <div className="col-span-2"><ProgressChart /></div>
               <div id="emg-block-2" style={activeBlock === 2 ? STYLE_ACTIVE : {}} className="rounded-2xl transition-all">

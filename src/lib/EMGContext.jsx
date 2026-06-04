@@ -15,7 +15,6 @@ export function EMGProvider({ children, wsUrl = "ws://192.168.4.1:8081" }) {
   const ultimaAccion = useRef(0);
   const DEBOUNCE_MS = 800;
 
-  // Owner system — solo un componente recibe clicks a la vez
   const ownerRef = useRef(null);
   const callbacksRef = useRef({});
 
@@ -54,7 +53,9 @@ export function EMGProvider({ children, wsUrl = "ws://192.168.4.1:8081" }) {
           const maxRms = Math.max(data.izq?.rms || 0, data.der?.rms || 0);
           if (maxRms > 0) setPico((prev) => Math.max(prev * 0.95, maxRms));
 
-          // Despachar clicks al owner actual
+          // 🔒 Bloquear clicks si algún electrodo está desconectado
+          if (!data.izq?.conectado || !data.der?.conectado) return;
+
           if (ahora - ultimaAccion.current < DEBOUNCE_MS) return;
           const clickIzq = data.izq?.click === 1;
           const clickDer = data.der?.click === 1;
@@ -67,13 +68,8 @@ export function EMGProvider({ children, wsUrl = "ws://192.168.4.1:8081" }) {
         } catch (e) {}
       };
 
-      ws.current.onclose = () => {
-        setConnected(false);
-      };
-
-      ws.current.onerror = () => {
-        setConnected(false);
-      };
+      ws.current.onclose = () => setConnected(false);
+      ws.current.onerror = () => setConnected(false);
     };
 
     conectar();
@@ -88,7 +84,7 @@ export function EMGProvider({ children, wsUrl = "ws://192.168.4.1:8081" }) {
     };
   }, [wsUrl]);
 
-  const umbral = 42;
+  const umbral = 500;
   const rmsActual = Math.max(emgData.izq?.rms || 0, emgData.der?.rms || 0);
 
   return (
@@ -112,7 +108,7 @@ export function useEMG() {
   const ctx = useContext(EMGContext);
   if (!ctx) return {
     emgData: { izq: { click: 0, rms: 0, mnf: 0, conectado: 0 }, der: { click: 0, rms: 0, mnf: 0, conectado: 0 } },
-    connected: false, rmsActual: 0, pico: 0, umbral: 42, latencia: 0,
+    connected: false, rmsActual: 0, pico: 0, umbral: 500, latencia: 0,
     izqConectado: false, derConectado: false,
     izqRms: 0, derRms: 0, izqMnf: 0, derMnf: 0,
     claimEMG: () => {}, releaseEMG: () => {},

@@ -151,7 +151,7 @@ export function useEMGKeyboard({
                 if (key) {
                   onSelectKey(key);
                   // Si es tecla de navegación, no reseteamos — ella misma maneja la zona
-                  if (["COMPARTIR","PRACTICA","PERFIL"].includes(key)) return;
+                  if (["COMPARTIR","PRACTICA","PERFIL","DICCIONARIO"].includes(key)) return;
                 }
               }
               setFilaBloqueada(false);

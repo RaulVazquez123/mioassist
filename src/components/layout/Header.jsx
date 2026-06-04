@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Logo from "@/components/brand/Logo";
-import { Activity, User, Dumbbell, Keyboard, LogOut, Info, Scale, Shield } from "lucide-react";
+import { User, Dumbbell, Keyboard, LogOut, Info, Scale, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/AuthContext";
 import { useEMG } from "@/lib/EMGContext";
@@ -22,13 +22,13 @@ export default function Header({ zona, headerIndex = 0 }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const isWriter = pathname === "/";
+  const { connected, claimEMG, releaseEMG } = useEMG();
+  const isWriter = pathname === "/" || pathname === "/writer";
 
   const [emgIndex, setEmgIndex] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmOption, setConfirmOption] = useState(0);
 
-  const { claimEMG, releaseEMG } = useEMG();
   const stateRef = useRef({});
   stateRef.current = { emgIndex, confirmOpen, confirmOption };
 
@@ -60,8 +60,6 @@ export default function Header({ zona, headerIndex = 0 }) {
     return () => releaseEMG("header");
   }, [isWriter, pathname]);
 
-  const handleLogout = () => logout();
-
   const activeEmgIndex = isWriter ? headerIndex : emgIndex;
   const activeZona = isWriter ? zona : (emgIndex !== null ? "header" : null);
 
@@ -78,16 +76,12 @@ export default function Header({ zona, headerIndex = 0 }) {
               <p className="text-xs text-muted-foreground mt-0.5">¿Ir a esta sección?</p>
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={() => { navigate(navItems[emgIndex].to); setConfirmOpen(false); setEmgIndex(null); }}
+              <button onClick={() => { navigate(navItems[emgIndex].to); setConfirmOpen(false); setEmgIndex(null); }}
                 style={confirmOption === 0 ? STYLE_CONFIRM_OK : {}}
-                className="flex-1 h-9 rounded-xl border-2 border-border font-semibold text-xs transition-all"
-              >✅ Confirmar</button>
-              <button
-                onClick={() => { setConfirmOpen(false); setConfirmOption(0); }}
+                className="flex-1 h-9 rounded-xl border-2 border-border font-semibold text-xs transition-all">✅ Confirmar</button>
+              <button onClick={() => { setConfirmOpen(false); setConfirmOption(0); }}
                 style={confirmOption === 1 ? STYLE_CONFIRM_NO : {}}
-                className="flex-1 h-9 rounded-xl border-2 border-border font-semibold text-xs transition-all"
-              >❌ Cancelar</button>
+                className="flex-1 h-9 rounded-xl border-2 border-border font-semibold text-xs transition-all">❌ Cancelar</button>
             </div>
           </div>
         </div>
@@ -103,9 +97,18 @@ export default function Header({ zona, headerIndex = 0 }) {
                 <h1 className="text-base font-semibold tracking-tight">
                   Mio<span className="text-primary">Assist</span>
                 </h1>
-                <span className="hidden sm:inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wider text-accent-foreground bg-accent/20 border border-accent/30 rounded-full px-2 py-0.5">
-                  <span className="w-1 h-1 rounded-full bg-accent animate-pulse" />
-                  EMG live
+                {/* Badge con color real de conexión */}
+                <span className={cn(
+                  "hidden sm:inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wider rounded-full px-2 py-0.5 border",
+                  connected
+                    ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-700"
+                    : "bg-red-500/20 border-red-500/40 text-red-700"
+                )}>
+                  <span className={cn(
+                    "w-1.5 h-1.5 rounded-full",
+                    connected ? "bg-emerald-500 animate-pulse" : "bg-red-500"
+                  )} />
+                  {connected ? "EMG live" : "EMG off"}
                 </span>
               </div>
               <p className="text-xs text-muted-foreground hidden sm:block">
@@ -137,10 +140,6 @@ export default function Header({ zona, headerIndex = 0 }) {
           </nav>
 
           <div className="hidden lg:flex items-center gap-2 shrink-0">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-card border border-border/60 soft-shadow">
-              <Activity className="w-3.5 h-3.5 text-accent" />
-              <span className="text-xs font-medium tabular-nums text-muted-foreground">Señal 74%</span>
-            </div>
             {user && (
               <div className="flex items-center gap-1.5">
                 <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-card border border-border/60 soft-shadow">
@@ -151,10 +150,8 @@ export default function Header({ zona, headerIndex = 0 }) {
                     {user.nombre?.split(" ")[0]}
                   </span>
                 </div>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-full border border-border/60 bg-card text-xs font-medium text-muted-foreground hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-all soft-shadow"
-                >
+                <button onClick={logout}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-full border border-border/60 bg-card text-xs font-medium text-muted-foreground hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-all soft-shadow">
                   <LogOut className="w-3.5 h-3.5" />
                   <span className="hidden xl:inline">Salir</span>
                 </button>

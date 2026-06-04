@@ -89,7 +89,7 @@ export default function Writer() {
       if (!prev.trim()) return `${fullWord} `;
       if (trailingSpace) return `${prev}${fullWord} `;
       const parts = prev.split(" ");
-      parts[parts.length - 1] = fullWord;
+      const partial = parts[parts.length - 1]; const word = partial.length > 0 && partial[0] === partial[0].toUpperCase() && partial[0] !== partial[0].toLowerCase() ? fullWord[0].toUpperCase() + fullWord.slice(1) : fullWord; parts[parts.length - 1] = word;
       return `${parts.join(" ")} `;
     });
     registerWordUsage(fullWord);
@@ -102,6 +102,8 @@ export default function Writer() {
     if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
     setTimeout(() => setHighlightSidebar(false), 1800);
     setMobileDictOpen(true);
+    setEmgZona("dictionary");
+    setEmgDictIndex(0);
     setZona("suggestions");
     setSuggestionIndex(0);
   };

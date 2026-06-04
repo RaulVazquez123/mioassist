@@ -5,6 +5,8 @@ import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
+import { EMGProvider } from '@/lib/EMGContext';
+import EMGDisconnectBanner from '@/components/layout/EMGDisconnectBanner';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import Writer from './pages/Writer';
 import Profile from './pages/Profile';
@@ -13,6 +15,7 @@ import Landing from './pages/Landing';
 import InfoPage from './pages/InfoPage';
 import LegalPage from './pages/LegalPage';
 import PrivacyPage from './pages/PrivacyPage';
+import EMGTestPage from './pages/EMGTestPage';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -43,6 +46,7 @@ const AuthenticatedApp = () => {
       <Route path="/info" element={<InfoPage />} />
       <Route path="/legal" element={<LegalPage />} />
       <Route path="/privacy" element={<PrivacyPage />} />
+      <Route path="/test-emg" element={<EMGTestPage />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
@@ -52,13 +56,16 @@ function App() {
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
-        <Router>
-          <Routes>
-            <Route path="/*" element={<AuthenticatedApp />} />
-          </Routes>
-        </Router>
-        <Toaster />
-        <SonnerToaster position="top-right" richColors />
+        <EMGProvider wsUrl="ws://localhost:8081">
+          <EMGDisconnectBanner />
+          <Router>
+            <Routes>
+              <Route path="/*" element={<AuthenticatedApp />} />
+            </Routes>
+          </Router>
+          <Toaster />
+          <SonnerToaster position="top-right" richColors />
+        </EMGProvider>
       </QueryClientProvider>
     </AuthProvider>
   )

@@ -14,7 +14,7 @@ export default function SignalGauge({ avg: avgProp = 68, max: maxProp = 118 }) {
     <div className="rounded-2xl border border-border/70 bg-card p-3 soft-shadow flex flex-col items-center justify-center">
       <div className="w-full flex items-center justify-between mb-1">
         <span className="text-[9px] uppercase tracking-wider font-semibold text-muted-foreground">Perfil de señal</span>
-        <span className="text-[9px] font-medium text-accent-foreground bg-accent/20 border border-accent/30 rounded-full px-1.5 py-0.5">µV</span>
+        <span className="text-[9px] font-medium text-accent-foreground bg-accent/20 border border-accent/30 rounded-full px-1.5 py-0.5">mV</span>
       </div>
       <div className="relative w-20 h-20">
         <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
@@ -37,7 +37,7 @@ export default function SignalGauge({ avg: avgProp = 68, max: maxProp = 118 }) {
       <div className="mt-1.5 flex items-center gap-3">
         <div className="text-center">
           <div className="text-muted-foreground text-[9px]">Pico</div>
-          <div className="font-semibold tabular-nums text-xs">{max} µV</div>
+          <div className="font-semibold tabular-nums text-xs">{max} mV</div>
         </div>
         <div className="w-px h-4 bg-border" />
         <div className="text-center">

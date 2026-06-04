@@ -181,7 +181,7 @@ function ActiveExercise({ exercise, onClose, onComplete }) {
   const handleBackspace = () => setTyped((t) => t.slice(0, -1));
   const handleClear = () => setTyped("");
   const handleSpace = () => { clicks.current++; setTyped((t) => t + " "); };
-  const handlePickWord = (w) => { setTyped((t) => (t.endsWith(" ") || t === "" ? t + w + " " : t + " " + w + " ")); setMobileDictOpen(false); };
+  const handlePickWord = (w) => { setTyped((t) => { const parts = t.split(" "); const partial = parts[parts.length - 1]; const word = partial.length > 0 && partial[0] === partial[0].toUpperCase() && partial[0] !== partial[0].toLowerCase() ? w[0].toUpperCase() + w.slice(1) : w; parts[parts.length - 1] = word; return parts.join(" ") + " "; }); setMobileDictOpen(false); };
   const openDictionary = () => { setMobileDictOpen(true); setEmgZona("dictionary"); setEmgDictIndex(0); };
 
   const ejecutarTecla = (value) => {
@@ -203,6 +203,7 @@ function ActiveExercise({ exercise, onClose, onComplete }) {
       const seconds = Math.floor((Date.now() - startTime.current) / 1000);
       const precision = totalChars.current > 0 ? Math.round((correctChars.current / totalChars.current) * 100) : 100;
       setStats({ seconds, clicks: clicks.current, precision });
+      try { const DAYS = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"]; const day = DAYS[new Date().getDay()]; const prev = JSON.parse(localStorage.getItem("mioassist_practice_sessions") || "[]"); prev.push({ day, precision, clicks: clicks.current }); localStorage.setItem("mioassist_practice_sessions", JSON.stringify(prev.slice(-7))); } catch {}
       setAllDone(true);
       onComplete(exercise.id);
     } else { setStep((s) => s + 1); setTyped(""); setShift(true); }
